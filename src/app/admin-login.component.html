@@ -1,0 +1,25 @@
+<main class="login-page">
+  <section class="login-visual"><div><span>BP</span><p>FASHION PARK</p></div><blockquote>Manage the collection.<br><em>Shape every story.</em></blockquote></section>
+  <section class="login-form-wrap">
+    <a routerLink="/" class="back-link">Back to the shop</a>
+    <div class="login-card">
+      <p class="eyebrow">Private workspace</p>
+      <h1>Admin sign in</h1>
+      <p class="intro">Sign in to add products, update prices, manage colors and keep stock availability accurate.</p>
+      @if (auth.user()) {
+        <div class="already-signed"><span>✓</span><p><strong>You’re already signed in</strong><small>{{ auth.user()?.email }}</small></p></div>
+        <a routerLink="/" class="primary-link">Open the admin workspace</a>
+      } @else {
+        @if (!auth.configured) { <div class="setup-notice"><strong>Firebase setup required</strong><span>Add the Firebase configuration and enable Email/Password authentication to activate this form.</span></div> }
+        <form (submit)="submit($event)">
+          <label>Email address<input type="email" name="email" autocomplete="username" required placeholder="admin@bpfashionpark.com"></label>
+          <label>Password<div class="password-field"><input [type]="passwordVisible() ? 'text' : 'password'" name="password" autocomplete="current-password" required placeholder="Your password"><button type="button" (click)="passwordVisible.set(!passwordVisible())">{{ passwordVisible() ? 'Hide' : 'Show' }}</button></div></label>
+          <a routerLink="/admin/forgot-password" class="forgot-link">Forgot your password?</a>
+          @if (error()) { <p class="login-error">{{ error() }}</p> }
+          <button class="login-button" type="submit" [disabled]="submitting() || !auth.configured">{{ submitting() ? 'Signing in…' : 'Sign in securely' }}</button>
+        </form>
+      }
+      <p class="security-note"><span>◇</span> This page has no public registration. The administrator account is created directly in Firebase.</p>
+    </div>
+  </section>
+</main>

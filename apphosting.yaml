@@ -1,0 +1,8 @@
+# Conservative defaults for the BP Fashion Park Angular SSR service.
+# Firebase App Hosting detects the Angular build and start commands.
+runConfig:
+  minInstances: 0
+  maxInstances: 3
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512

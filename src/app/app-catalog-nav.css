@@ -1,0 +1,55 @@
+@media (min-width: 1101px) {
+  .nav-group { position: static; }
+  .main-navigation.mega-dismissed .nav-submenu {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transform: translateY(8px) !important;
+  }
+  .nav-submenu, .nav-group:nth-last-child(-n + 4) .nav-submenu {
+    position: absolute; top: 82px; right: 0; left: 0; width: 100%; padding: 0;
+    border-top: 1px solid #d8cec4; background: #eee9e1;
+    box-shadow: 0 28px 55px #211d1a24; transform: translateY(8px);
+  }
+  .nav-submenu::before { top: -18px; height: 18px; }
+  .mega-columns {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: clamp(34px, 5vw, 86px); width: min(1120px, calc(100% - 80px));
+    min-height: 260px; margin: 0 auto; padding: 42px 0 54px;
+  }
+  .mega-column { min-width: 0; }
+}
+
+.mega-overview > span { display: block; margin-bottom: 14px; color: #9a8e84; font-size: 8px; letter-spacing: .18em; text-transform: uppercase; }
+.mega-view-all { width: auto !important; padding: 0 !important; border: 0 !important; color: #211d1a !important; font-family: Georgia, serif; font-size: 17px !important; letter-spacing: 0 !important; text-transform: none !important; }
+.mega-view-all:hover { color: #a94f31 !important; }
+.nav-submenu .nav-child { width: 100%; justify-content: flex-start; padding: 0 0 15px; border: 0; color: #211d1a; font-family: Georgia, serif; font-size: 17px; font-weight: 400; letter-spacing: 0; text-transform: none; }
+.nav-subchildren { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.nav-subchildren button { width: auto; justify-content: flex-start; padding: 7px 0; border: 0; color: #71665e; font-size: 10px; letter-spacing: .02em; text-transform: none; }
+.nav-subchildren button:hover { color: #a94f31; }
+.mobile-navigation { display: none; }
+
+@media (max-width: 1100px) {
+  .menu-button { display: block; grid-column: 1; width: 30px; padding: 5px; }
+  .menu-button span { display: block; height: 1px; margin: 6px 0; background: currentColor; }
+  .site-header .desktop-navigation { display: none !important; }
+  .mobile-navigation { display: block; position: absolute; top: 82px; right: 0; left: 0; height: calc(100vh - 82px); overflow-y: auto; background: #eee9e1; border-top: 1px solid #d8cec4; box-shadow: 0 24px 45px #211d1a2b; }
+  .mobile-menu-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; padding: 24px 30px; background: #eee9e1ee; border-bottom: 1px solid #d8cec4; backdrop-filter: blur(10px); }
+  .mobile-menu-head > div { display: flex; flex-direction: column; gap: 5px; }
+  .mobile-menu-head small { color: #8b7f75; font-size: 8px; letter-spacing: .18em; text-transform: uppercase; }
+  .mobile-menu-head strong { font-family: Georgia, serif; font-size: 24px; font-weight: 400; }
+  .mobile-menu-close { width: 42px; height: 42px; border: 1px solid #c9bdb2; border-radius: 50%; background: transparent; color: #211d1a; font-size: 25px; font-weight: 300; }
+  .mobile-menu-body { padding: 18px 30px 50px; }
+  .mobile-menu-back, .mobile-menu-view-all { border: 0; background: transparent; color: #756a61; padding: 12px 0; font-size: 9px; letter-spacing: .13em; text-transform: uppercase; }
+  .mobile-menu-back { margin-right: 28px; }
+  .mobile-menu-view-all { color: #a94f31; }
+  .mobile-menu-list { display: flex; flex-direction: column; margin-top: 10px; }
+  .mobile-menu-list > button { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 20px 0; border: 0; border-bottom: 1px solid #d3c9bf; background: transparent; color: #211d1a; text-align: left; }
+  .mobile-menu-list span { font-family: Georgia, serif; font-size: clamp(25px, 6vw, 34px); }
+  .mobile-menu-list small { color: #8b7f75; font-size: 8px; letter-spacing: .13em; text-transform: uppercase; }
+}
+
+@media (max-width: 560px) {
+  .mobile-menu-head { padding-right: 20px; padding-left: 20px; }
+  .mobile-menu-body { padding-right: 20px; padding-left: 20px; }
+}

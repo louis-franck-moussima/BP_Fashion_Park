@@ -1,0 +1,33 @@
+@if (catalogLoading()) {
+  <main class="detail-state" role="status"><span></span><h1>Loading product</h1><p>Checking the latest information and availability.</p></main>
+} @else if (catalogError()) {
+  <main class="detail-state detail-state-error" role="alert"><strong>!</strong><h1>Product temporarily unavailable</h1><p>We could not retrieve the live catalog. Please refresh in a moment.</p><a routerLink="/">Return home</a></main>
+} @else if (product(); as item) {
+  <main class="detail-page">
+    <nav class="breadcrumbs" aria-label="Breadcrumb"><a routerLink="/">Home</a>@for (category of categoryStore.path(item.category); track category.id) { <span>›</span><a [routerLink]="categoryStore.url(category.id)">{{ category.name }}</a> }<span>›</span><span>{{ item.name }}</span></nav>
+    <section class="product-layout">
+      <div class="gallery">
+        <div class="gallery-main" [class]="'gallery-main ' + item.art">
+          @if (item.images.length) { <img [src]="item.images[selectedImage()].url" [alt]="item.images[selectedImage()].alt || item.name"> } @else { <div class="fallback-product"><span>BP</span><small>{{ categoryName(item.category) }}</small></div> }
+          @if (item.featured) { <span class="detail-tag">Featured</span> }
+        </div>
+        @if (item.images.length > 1) { <div class="gallery-thumbs">@for (image of item.images; track image.url; let i = $index) { <button [class.active]="selectedImage() === i" (click)="selectedImage.set(i)"><img [src]="image.url" [alt]="image.alt"></button> }</div> }
+      </div>
+      <div class="product-summary">
+        <p class="detail-category">{{ categoryName(item.category) }}</p>
+        <h1>{{ item.name }}</h1>
+        <p class="price">{{ priceLabel(item) }} @if (item.negotiable) { <small>· Negotiable</small> }</p>
+        <p class="description">{{ item.description }}</p>
+        @if (item.audiences?.length || item.ageRange || item.tags?.length) { <div class="product-attributes">@for (audience of item.audiences ?? []; track audience) { <span>{{ audience }}</span> }@if (item.ageRange) { <span>{{ item.ageRange }}</span> }@for (tag of item.tags ?? []; track tag) { <span>{{ tag }}</span> }</div> }
+        <div class="availability-box" [class.out]="totalStock() === 0"><span></span><div><strong>{{ totalStock() === 0 ? 'Currently out of stock' : 'Available now' }}</strong><small>{{ totalStock() === 0 ? 'Check again soon for availability.' : totalStock() + ' pieces available' }}</small></div></div>
+        <div class="color-section"><div class="option-heading"><strong>Color</strong><span>{{ selectedColor()?.name }}</span></div><div class="color-options">@for (color of item.colors; track color.name) { <button [class.selected]="selectedColor()?.name === color.name" (click)="selectColor(color)" [attr.aria-label]="'Select ' + color.name"><i [style.background]="color.hex"></i><span>{{ color.name }}</span><small>Color option</small></button> }</div></div>
+        @if (item.sizes?.length) { <div class="size-section"><div class="option-heading"><strong>Size / length</strong><span>{{ selectedSize() }}</span></div><div class="size-options">@for (size of item.sizes; track size) { <button [class.selected]="selectedSize() === size" (click)="selectSize(size)">{{ size }}</button> }</div></div> }
+        <button class="contact-button" [disabled]="!selectedColor() || totalStock() === 0" (click)="addToBag()">{{ totalStock() > 0 ? 'Add to request bag' : 'Currently unavailable' }}</button>
+        <div class="product-notes"><p><span>◇</span><strong>Selected with care</strong><small>Curated by BP Fashion Park</small></p><p><span>○</span><strong>Need more information?</strong><small>Contact us for sizes and collection details</small></p></div>
+      </div>
+    </section>
+    @if (recommendations().length) { <section class="related recommendations"><div class="recommendation-heading"><div><p>Recommended for you</p><h2>Complete your <em>look</em></h2></div><p>Chosen from matching categories, colors and pieces currently available.</p></div><div>@for (other of recommendations(); track other.id) { <a [routerLink]="productUrl(other.category, other.id)" class="recommendation-card"><figure [class]="other.art + (other.images.length ? ' has-image' : '')">@if (other.images.length) { <img [src]="other.images[0].url" [alt]="other.images[0].alt || other.name"> } @else { <span>BP</span> }<small class="reason">{{ recommendationReason(other.category) }}</small><small class="rec-stock" [class.out]="stockOf(other.id) === 0">{{ stockOf(other.id) ? stockOf(other.id) + ' available' : 'Out of stock' }}</small></figure><div class="rec-info"><div><h3>{{ other.name }}</h3><small>{{ categoryName(other.category) }}</small></div><strong>{{ priceLabel(other) }}</strong></div><div class="rec-colors">@for (color of other.colors.slice(0, 4); track color.name) { <i [style.background]="color.hex"></i> }</div></a> }</div></section> }
+  </main>
+} @else {
+  <main class="not-found"><p>Product not found</p><h1>This piece may no longer be available.</h1><a routerLink="/">Return to the collection</a></main>
+}

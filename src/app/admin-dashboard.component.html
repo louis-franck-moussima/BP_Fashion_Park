@@ -1,0 +1,523 @@
+<main class="admin-shell">
+  <aside class="admin-sidebar">
+    <a routerLink="/" class="admin-brand"
+      ><span>BP</span><small>FASHION PARK</small></a
+    >
+    <nav aria-label="Admin navigation">
+      <button
+        [class.active]="section() === 'overview'"
+        (click)="section.set('overview')"
+      >
+        <span>◇</span> Overview</button
+      ><button
+        [class.active]="section() === 'products'"
+        (click)="section.set('products')"
+      >
+        <span>▦</span> Products <small>{{ products().length }}</small></button
+      ><button
+        [class.active]="section() === 'categories'"
+        (click)="section.set('categories')"
+      >
+        <span>⌘</span> Categories
+        <small>{{ categoryStore.categories().length }}</small>
+      </button>
+    </nav>
+    <div class="sidebar-bottom">
+      <a routerLink="/">View storefront</a>
+      @if (auth.user()) {
+        <button (click)="logout()">Sign out</button>
+      } @else {
+        <a routerLink="/admin/login" class="sign-in-link">Admin sign in</a>
+      }
+    </div>
+  </aside>
+  <section class="admin-content">
+    <header class="admin-topbar">
+      <div>
+        <p>BP Fashion Park</p>
+        <h1>
+          {{
+            section() === "overview"
+              ? "Dashboard"
+              : section() === "products"
+                ? "Products"
+                : "Categories"
+          }}
+        </h1>
+      </div>
+      <div
+        class="admin-status"
+        [class.connected]="productStore.firebaseConfigured"
+      >
+        <i></i
+        ><span>{{
+          productStore.firebaseConfigured ? "Firebase connected" : "Demo data"
+        }}</span>
+      </div>
+    </header>
+    @if (catalogLoading()) {
+      <div class="catalog-status" role="status">
+        <span></span>
+        <div>
+          <strong>Loading catalog data</strong>
+          <p>
+            Retrieving products, categories and current stock from Firebase.
+          </p>
+        </div>
+      </div>
+    }
+    @if (catalogError()) {
+      <div class="catalog-status catalog-status-error" role="alert">
+        <span>!</span>
+        <div>
+          <strong>Live catalog unavailable</strong>
+          <p>
+            {{ catalogError() }} Refresh and restore the connection before
+            making changes.
+          </p>
+        </div>
+      </div>
+    }
+    @if (!auth.loading() && !auth.user()) {
+      <div class="setup-banner">
+        <span>Setup mode</span>
+        <div>
+          <strong>The administrator account has not been connected yet.</strong>
+          <p>
+            You can review the backend with reference data. Product and category
+            writes remain protected by Firebase until an administrator signs in.
+          </p>
+        </div>
+        <a routerLink="/admin/login">Go to sign in</a>
+      </div>
+    }
+    @if (
+      !catalogLoading() &&
+      !catalogError() &&
+      categoryStore.categories().length === 0
+    ) {
+      <div class="setup-banner starter-banner">
+        <span>Starter setup</span>
+        <div>
+          <strong>Import the prepared shop structure</strong>
+          <p>
+            Add the Women, Men, Children, Unisex, Beauty & Hair, Accessories and
+            Travel categories with their subcategories. You can edit, hide,
+            reorder or delete them afterward.
+          </p>
+        </div>
+        <button
+          (click)="importStarterCategories()"
+          [disabled]="!auth.user() || importingStarterCategories()"
+        >
+          {{
+            importingStarterCategories() ? "Importing…" : "Import categories"
+          }}
+        </button>
+      </div>
+    }
+
+    @if (section() === "overview") {
+      <div class="metric-grid">
+        <article>
+          <span>Products</span><strong>{{ products().length }}</strong
+          ><small
+            >Across {{ categoryStore.active().length }} visible
+            categories</small
+          >
+        </article>
+        <article>
+          <span>Units in stock</span><strong>{{ totalUnits() }}</strong
+          ><small>{{ lowStock().length }} low-stock products</small>
+        </article>
+        <article>
+          <span>Out of stock</span><strong>{{ outOfStock().length }}</strong
+          ><small>Require inventory attention</small>
+        </article>
+        <article>
+          <span>Inventory value</span
+          ><strong>€{{ inventoryValue().toFixed(0) }}</strong
+          ><small>Estimated at retail price</small>
+        </article>
+      </div>
+      <section class="admin-panel-block">
+        <div class="block-heading">
+          <div>
+            <span>Inventory overview</span>
+            <h2>Recent products</h2>
+          </div>
+          <button (click)="section.set('products')">View all</button>
+        </div>
+        <div class="admin-table">
+          <div class="table-row table-head">
+            <span>Product</span><span>Category</span><span>Price</span
+            ><span>Stock</span><span>Status</span>
+          </div>
+          @for (product of recentProducts(); track product.id) {
+            <div class="table-row">
+              <span class="product-cell">
+                @if (product.images.length) {
+                  <img [src]="product.images[0].url" [alt]="product.name" />
+                } @else {
+                  <i>{{ product.name.charAt(0) }}</i>
+                }
+                <strong>{{ product.name }}</strong></span
+              ><span>{{ categoryName(product.category) }}</span
+              ><span>{{ priceLabel(product) }}</span
+              ><span>{{ stockOf(product) }}</span
+              ><span
+                ><b
+                  class="stock-status"
+                  [class.out]="stockOf(product) === 0"
+                  [class.low]="stockOf(product) > 0 && stockOf(product) <= 3"
+                  >{{
+                    stockOf(product) === 0
+                      ? "Out of stock"
+                      : stockOf(product) <= 3
+                        ? "Low stock"
+                        : "Available"
+                  }}</b
+                ></span
+              >
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    @if (section() === "products") {
+      <section class="admin-panel-block">
+        <div class="block-heading">
+          <div>
+            <span>Catalog management</span>
+            <h2>All products</h2>
+          </div>
+          <button
+            class="admin-primary-action"
+            (click)="newProduct()"
+            [disabled]="!auth.user()"
+          >
+            ＋ Add product
+          </button>
+        </div>
+        <div class="admin-table">
+          <div class="table-row table-head">
+            <span>Product</span><span>Category</span><span>Price</span
+            ><span>Stock</span><span>Actions</span>
+          </div>
+          @for (product of products(); track product.id) {
+            <div class="table-row">
+              <span class="product-cell">
+                @if (product.images.length) {
+                  <img [src]="product.images[0].url" [alt]="product.name" />
+                } @else {
+                  <i>{{ product.name.charAt(0) }}</i>
+                }
+                <strong>{{ product.name }}</strong></span
+              ><span>{{ categoryName(product.category) }}</span
+              ><span>{{ priceLabel(product) }}</span
+              ><span>{{ stockOf(product) }}</span
+              ><span
+                ><button
+                  class="row-action"
+                  (click)="editProduct(product)"
+                  [disabled]="!auth.user()"
+                >
+                  Edit
+                </button></span
+              >
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    @if (section() === "categories") {
+      <section class="admin-panel-block">
+        <div class="block-heading">
+          <div>
+            <span>Catalog structure</span>
+            <h2>Category hierarchy</h2>
+          </div>
+        </div>
+        @if (auth.user()) {
+          <form class="dashboard-category-form" (submit)="addCategory($event)">
+            <label
+              >Name<input
+                name="name"
+                required
+                minlength="2"
+                maxlength="60"
+                placeholder="e.g. Training shoes" /></label
+            ><label
+              >Parent<select name="parentCategoryId">
+                <option value="">None — main category</option>
+                @for (category of allCategories(); track category.id) {
+                  <option [value]="category.id">
+                    {{ categoryStore.pathLabel(category.id) }}
+                  </option>
+                }
+              </select></label
+            ><label
+              >Description<input
+                name="description"
+                maxlength="240"
+                placeholder="Short storefront description" /></label
+            ><button type="submit">Add category</button>
+          </form>
+        }
+        @if (categoryError()) {
+          <p class="dashboard-error">{{ categoryError() }}</p>
+        }
+        <div class="category-admin-list">
+          @for (category of allCategories(); track category.id) {
+            <article
+              [class.hidden-category]="!category.active"
+              [style.--depth]="categoryDepth(category.id)"
+            >
+              <div>
+                <span>{{ category.parentCategoryId ? "↳" : "◇" }}</span>
+                <p>
+                  <strong>{{ category.name }}</strong
+                  ><small>{{ categoryPath(category.id) }}</small>
+                </p>
+              </div>
+              <div class="category-row-actions">
+                <span>{{ categoryProductCount(category.id) }} products</span
+                ><label class="category-visibility"
+                  ><input
+                    type="checkbox"
+                    [checked]="category.active"
+                    (change)="
+                      setCategoryVisibility(
+                        category,
+                        $any($event.target).checked
+                      )
+                    "
+                    [disabled]="!auth.user()"
+                  /><i></i
+                  ><small>{{
+                    category.active ? "Shown in store" : "Hidden from store"
+                  }}</small></label
+                ><button
+                  (click)="moveCategory(category, -1)"
+                  [disabled]="!auth.user()"
+                  aria-label="Move category up"
+                >
+                  ↑</button
+                ><button
+                  (click)="moveCategory(category, 1)"
+                  [disabled]="!auth.user()"
+                  aria-label="Move category down"
+                >
+                  ↓</button
+                ><button
+                  class="danger"
+                  (click)="deleteCategory(category)"
+                  [disabled]="!auth.user()"
+                >
+                  Delete
+                </button>
+              </div>
+            </article>
+          }
+        </div>
+      </section>
+    }
+  </section>
+</main>
+@if (productEditorOpen()) {
+  <div class="editor-backdrop" (click)="closeProductEditor()"></div>
+  <aside class="product-editor" aria-label="Product editor">
+    <header>
+      <div>
+        <span>Catalog management</span>
+        <h2>{{ editingProductId() ? "Edit product" : "New product" }}</h2>
+      </div>
+      <button (click)="closeProductEditor()" aria-label="Close editor">
+        ×
+      </button>
+    </header>
+    <form class="dashboard-product-form" (submit)="saveProduct($event)">
+      <label
+        >Product name<input
+          name="name"
+          required
+          minlength="2"
+          maxlength="100"
+          placeholder="e.g. Riviera jacket"
+      /></label>
+      <div class="editor-form-row">
+        <label
+          >Category<select name="category" required>
+            @for (category of categoryStore.active(); track category.id) {
+              <option [value]="category.id">
+                {{ categoryStore.pathLabel(category.id) }}
+              </option>
+            }
+          </select></label
+        ><label
+          >Price mode<select name="priceMode">
+            <option value="fixed">Fixed price</option>
+            <option value="from">Starting at</option>
+            <option value="on-request">Price on request</option>
+          </select></label
+        >
+      </div>
+      <div class="editor-form-row">
+        <label
+          >Base price (€)<input
+            name="price"
+            type="number"
+            min="0"
+            max="1000000"
+            step="0.01"
+            required
+            value="0"
+          /><small>Used for fixed and “starting at” prices.</small></label
+        ><label class="dashboard-featured"
+          ><input name="negotiable" type="checkbox" /> Price is
+          negotiable</label
+        >
+      </div>
+      <label
+        >Stock quantity<input
+          name="stock"
+          type="number"
+          min="0"
+          max="100000"
+          step="1"
+          required
+          value="0"
+        /><small
+          >Total quantity available for this product, independent of its
+          colors.</small
+        ></label
+      >
+      <label
+        >Display style<select name="art">
+          <option value="dress">Clothing</option>
+          <option value="shoe">Shoes</option>
+          <option value="bag">Structured bag</option>
+          <option value="tote">Tote bag</option>
+          <option value="necklace">Jewelry</option>
+          <option value="case">Suitcase</option>
+        </select></label
+      >
+      <label
+        >Description<textarea
+          name="description"
+          rows="4"
+          required
+          minlength="10"
+          maxlength="1000"
+        ></textarea>
+      </label>
+      <div class="dashboard-media">
+        <div>
+          <span
+            ><strong>Product images</strong
+            ><small>The first image is the storefront cover.</small></span
+          ><label class="dashboard-upload"
+            >{{ uploadingImages() ? "Uploading…" : "＋ Add images"
+            }}<input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/avif"
+              multiple
+              (change)="selectImages($event)"
+              [disabled]="uploadingImages()"
+          /></label>
+        </div>
+        @if (pendingImages().length) {
+          <section>
+            @for (image of pendingImages(); track image.url; let i = $index) {
+              <figure>
+                <img [src]="image.url" [alt]="image.alt" />
+                <figcaption>{{ i === 0 ? "Cover" : i + 1 }}</figcaption>
+                <div>
+                  <button
+                    type="button"
+                    (click)="moveImage(i, -1)"
+                    [disabled]="i === 0"
+                  >
+                    ←</button
+                  ><button
+                    type="button"
+                    (click)="moveImage(i, 1)"
+                    [disabled]="i === pendingImages().length - 1"
+                  >
+                    →</button
+                  ><button type="button" (click)="removeImage(i)">×</button>
+                </div>
+              </figure>
+            }
+          </section>
+        } @else {
+          <p>No product images yet.</p>
+        }
+      </div>
+      <label
+        >Available colors<input
+          name="colors"
+          required
+          maxlength="1000"
+          placeholder="Black|#222222, Red|#a84232"
+        /><small
+          >Use unique names and six-digit hex colors. Format: name | #hex,
+          separated by commas.</small
+        ></label
+      >
+      <label
+        >Available sizes or lengths<input
+          name="sizes"
+          placeholder="36, 37, 38 · S, M, L · 12 in, 14 in"
+        /><small
+          >Optional. Use sizes for shoes and clothes, or lengths for wigs.
+          Separate values with commas.</small
+        ></label
+      >
+      <div class="editor-form-row">
+        <label
+          >Audience<input
+            name="audiences"
+            maxlength="500"
+            placeholder="Girls, Boys, Unisex"
+          /><small>Optional. Separate unique values with commas.</small></label
+        ><label
+          >Age range<input
+            name="ageRange"
+            maxlength="80"
+            placeholder="e.g. 3–5 years"
+          /><small>Useful mainly for children’s products.</small></label
+        >
+      </div>
+      <label
+        >Product tags<input
+          name="tags"
+          maxlength="1500"
+          placeholder="Casual, Ceremony, Limited quantity"
+        /><small
+          >Optional searchable labels. Separate tags with commas.</small
+        ></label
+      >
+      <label class="dashboard-featured"
+        ><input name="featured" type="checkbox" /> Feature this product</label
+      >
+      @if (formError()) {
+        <p class="dashboard-error">{{ formError() }}</p>
+      }
+      <button
+        class="editor-save"
+        type="submit"
+        [disabled]="savingProduct() || uploadingImages()"
+      >
+        {{ savingProduct() ? "Saving…" : "Save product" }}
+      </button>
+      @if (editingProductId()) {
+        <button class="editor-delete" type="button" (click)="deleteProduct()">
+          Delete product
+        </button>
+      }
+    </form>
+  </aside>
+}

@@ -1,0 +1,1 @@
+.category-child-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:15px}.category-child-list span{border:1px solid #d1c5ba;border-radius:20px;padding:5px 8px;color:#665b54;font-size:7px;text-transform:uppercase;letter-spacing:.08em}.subcategory-grid a:hover .category-child-list span{border-color:#b99f8a;background:#f7f4ef99}

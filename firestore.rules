@@ -1,0 +1,79 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      // This project has no public registration. Only the owner account is
+      // created in Firebase Authentication.
+      return request.auth != null;
+    }
+
+    function validCategory(categoryId) {
+      let data = request.resource.data;
+      return request.resource.data.keys().hasAll([
+          'id', 'name', 'slug', 'description', 'parentCategoryId', 'active', 'displayOrder'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'id', 'name', 'slug', 'description', 'parentCategoryId', 'active', 'displayOrder', 'imageUrl'
+        ])
+        && data.id is string && data.id == categoryId && data.id.size() <= 160
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 60
+        && data.slug is string && data.slug.size() >= 1 && data.slug.size() <= 80
+        && data.description is string && data.description.size() <= 240
+        && (data.parentCategoryId == null
+          || (data.parentCategoryId is string
+            && data.parentCategoryId != data.id
+            && existsAfter(/databases/$(database)/documents/categories/$(data.parentCategoryId))))
+        && data.active is bool
+        && data.displayOrder is int && data.displayOrder >= 0
+        && (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() <= 2000));
+    }
+
+    function validProduct(productId) {
+      let data = request.resource.data;
+      return request.resource.data.keys().hasAll([
+          'id', 'name', 'category', 'price', 'art', 'description', 'images', 'colors', 'createdAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'id', 'name', 'category', 'price', 'priceMode', 'negotiable', 'stock', 'art',
+          'description', 'images', 'colors', 'sizes', 'audiences', 'ageRange', 'tags',
+          'featured', 'createdAt'
+        ])
+        && data.id is string && data.id == productId && data.id.size() <= 160
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 100
+        && data.category is string
+        && existsAfter(/databases/$(database)/documents/categories/$(data.category))
+        && data.price is number && data.price >= 0 && data.price <= 1000000
+        && (!('priceMode' in data) || data.priceMode in ['fixed', 'from', 'on-request'])
+        && (!('priceMode' in data) || data.priceMode == 'on-request' || data.price > 0)
+        && (!('negotiable' in data) || data.negotiable is bool)
+        && (!('stock' in data) || (data.stock is int && data.stock >= 0 && data.stock <= 100000))
+        && data.art is string && data.art in ['dress', 'shoe', 'bag', 'tote', 'necklace', 'case']
+        && data.description is string && data.description.size() >= 10 && data.description.size() <= 1000
+        && data.images is list && data.images.size() >= 1 && data.images.size() <= 8
+        && data.colors is list && data.colors.size() >= 1 && data.colors.size() <= 20
+        && (!('sizes' in data) || (data.sizes is list && data.sizes.size() <= 30))
+        && (!('audiences' in data) || (data.audiences is list && data.audiences.size() <= 10))
+        && (!('ageRange' in data) || (data.ageRange is string && data.ageRange.size() <= 80))
+        && (!('tags' in data) || (data.tags is list && data.tags.size() <= 30))
+        && (!('featured' in data) || data.featured is bool)
+        && data.createdAt is number && data.createdAt > 0;
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && validProduct(productId);
+      allow delete: if isAdmin();
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && validCategory(categoryId);
+      allow delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
