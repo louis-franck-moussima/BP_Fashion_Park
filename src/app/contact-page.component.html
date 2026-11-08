@@ -1,0 +1,52 @@
+<article class="contact-page">
+  <header class="contact-hero">
+    <p>Visit · Ask · Discover</p>
+    <h1>Let’s find your<br /><em>next favourite.</em></h1>
+    <span>Questions about availability, sizing or delivery? We are happy to help.</span>
+  </header>
+
+  <section class="contact-content">
+    <div class="contact-details">
+      <p class="section-label">Contact BP Fashion Park</p>
+      <h2>Talk to us directly.</h2>
+      <p>Send a message before visiting to confirm that the piece you want is still available.</p>
+
+      <dl>
+        <div><dt>WhatsApp</dt><dd><a [href]="storeSettings.whatsappUrl('Hello BP Fashion Park')" target="_blank" rel="noopener">Start a conversation</a></dd></div>
+        <div><dt>Email</dt><dd><a [href]="emailUrl()">{{ storeSettings.settings().contactEmail }}</a></dd></div>
+        <div><dt>Location</dt><dd>{{ address() }}</dd></div>
+        <div><dt>Delivery</dt><dd>{{ storeSettings.settings().deliveryInformation }}</dd></div>
+      </dl>
+    </div>
+
+    <form class="contact-form" (submit)="sendWhatsApp($event)">
+      <p class="section-label">Send an enquiry</p>
+      <label>Your name<input required minlength="2" maxlength="80" autocomplete="name" [value]="name()" (input)="name.set($any($event.target).value)" /></label>
+      <div>
+        <label>Phone <small>Optional</small><input type="tel" maxlength="30" autocomplete="tel" [value]="phone()" (input)="phone.set($any($event.target).value)" /></label>
+        <label>City <small>Optional</small><input maxlength="80" autocomplete="address-level2" [value]="city()" (input)="city.set($any($event.target).value)" /></label>
+      </div>
+      <label>Your message<textarea required minlength="5" maxlength="500" rows="5" placeholder="Tell us what you are looking for…" [value]="message()" (input)="message.set($any($event.target).value)"></textarea></label>
+      <button type="submit">Continue on WhatsApp</button>
+      <small>No payment is requested through this form.</small>
+    </form>
+  </section>
+
+  <section class="location-section">
+    <div>
+      <p class="section-label">Find us</p>
+      <h2>Our location.</h2>
+      <p>The map currently shows a general placeholder in Yaoundé. The owner’s exact location will replace it before launch.</p>
+      <strong>{{ address() }}</strong>
+    </div>
+    <div class="map-frame">
+      <iframe
+        title="Placeholder Google Map for BP Fashion Park in Yaoundé"
+        src="https://www.google.com/maps?q=Yaound%C3%A9%2C%20Cameroon&amp;z=12&amp;output=embed"
+        loading="lazy"
+        referrerpolicy="no-referrer"
+      ></iframe>
+      <span>Placeholder location · Exact address coming soon</span>
+    </div>
+  </section>
+</article>

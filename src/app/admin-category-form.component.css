@@ -1,0 +1,45 @@
+.category-kind {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.category-kind button {
+  border: 1px solid #d2c7bd;
+  background: #fff;
+  padding: 13px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #756a62;
+}
+
+.category-kind button.active {
+  border-color: #211d1a;
+  background: #211d1a;
+  color: #fff;
+}
+
+.category-kind strong {
+  font-family: Georgia, serif;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.category-kind small {
+  font-size: 8px;
+  opacity: 0.72;
+}
+
+.dashboard-category-form label small {
+  color: #8b7f76;
+  font-size: 8px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+@media (max-width: 700px) {
+  .category-kind { grid-template-columns: 1fr; }
+}

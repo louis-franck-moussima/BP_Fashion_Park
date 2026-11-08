@@ -1,5 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AdminAuthService } from './admin-auth.service';
 
 @Component({
@@ -11,6 +11,7 @@ import { AdminAuthService } from './admin-auth.service';
 export class AdminLoginComponent {
   readonly auth = inject(AdminAuthService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   readonly error = signal('');
   readonly submitting = signal(false);
   readonly passwordVisible = signal(false);
@@ -22,7 +23,10 @@ export class AdminLoginComponent {
     this.submitting.set(true);
     try {
       await this.auth.login(String(data.get('email')), String(data.get('password')));
-      await this.router.navigate(['/']);
+      const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+      await this.router.navigateByUrl(
+        returnUrl?.startsWith('/admin') ? returnUrl : '/admin',
+      );
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Unable to sign in.');
     } finally {

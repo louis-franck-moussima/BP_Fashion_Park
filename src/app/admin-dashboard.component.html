@@ -6,28 +6,34 @@
     <nav aria-label="Admin navigation">
       <button
         [class.active]="section() === 'overview'"
-        (click)="section.set('overview')"
+        (click)="selectSection('overview')"
       >
         <span>◇</span> Overview</button
       ><button
         [class.active]="section() === 'products'"
-        (click)="section.set('products')"
+        (click)="selectSection('products')"
       >
         <span>▦</span> Products <small>{{ products().length }}</small></button
       ><button
         [class.active]="section() === 'categories'"
-        (click)="section.set('categories')"
+        (click)="selectSection('categories')"
       >
         <span>⌘</span> Categories
-        <small>{{ categoryStore.categories().length }}</small></button
+        <small>{{ mainCategories().length }}</small></button
+      ><button
+        [class.active]="section() === 'subcategories'"
+        (click)="selectSection('subcategories')"
+      >
+        <span>↳</span> Subcategories
+        <small>{{ subcategoryCount() }}</small></button
       ><button
         [class.active]="section() === 'requests'"
-        (click)="section.set('requests')"
+        (click)="selectSection('requests')"
       >
         <span>✉</span> Requests <small>{{ newRequestCount() }}</small></button
       ><button
         [class.active]="section() === 'settings'"
-        (click)="section.set('settings')"
+        (click)="selectSection('settings')"
       >
         <span>⚙</span> Settings
       </button>
@@ -157,7 +163,7 @@
             <span>Inventory overview</span>
             <h2>Recent products</h2>
           </div>
-          <button (click)="section.set('products')">View all</button>
+          <button (click)="selectSection('products')">View all</button>
         </div>
         <div class="admin-table">
           <div class="table-row table-head">
@@ -299,26 +305,44 @@
                 required
                 minlength="2"
                 maxlength="60"
-                placeholder="e.g. Training shoes" /></label
-            ><label
-              >Parent<select name="parentCategoryId">
-                <option value="">None — main category</option>
-                @for (
-                  category of availableCategoryParents();
-                  track category.id
-                ) {
-                  <option [value]="category.id">
-                    {{ categoryStore.pathLabel(category.id) }}
-                  </option>
-                }
-              </select></label
-            ><label
+                placeholder="e.g. Women" /></label
+            >
+            <label
               >Description<input
                 name="description"
                 maxlength="240"
                 placeholder="Short storefront description" /></label
-            ><button type="submit">
-              {{ editingCategoryId() ? "Save category" : "Add category" }}
+            ><label
+              >Image focus<select name="imagePosition">
+                <option value="center">Center</option>
+                <option value="top">Top</option>
+                <option value="bottom">Bottom</option></select
+              ><small>Controls how the cover is cropped.</small></label
+            >
+            <div class="category-image-editor">
+              @if (pendingCategoryImage(); as image) {
+                <figure>
+                  <img [src]="image.url" [alt]="image.alt" /><button
+                    type="button"
+                    (click)="removeCategoryImage()"
+                  >
+                    Remove image
+                  </button>
+                </figure>
+              } @else {
+                <p>No category cover image.</p>
+              }
+              <label class="dashboard-upload"
+                >{{ categoryImageUploading() ? "Uploading…" : "Upload cover"
+                }}<input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/avif"
+                  (change)="selectCategoryImage($event)"
+                  [disabled]="categoryImageUploading()"
+              /></label>
+            </div>
+            <button type="submit" [disabled]="categoryImageUploading()">
+              {{ editingCategoryId() ? "Save category" : "Add main category" }}
             </button>
             @if (editingCategoryId()) {
               <button
@@ -335,7 +359,7 @@
           <p class="dashboard-error">{{ categoryError() }}</p>
         }
         <div class="category-admin-list">
-          @for (category of allCategories(); track category.id) {
+          @for (category of mainCategories(); track category.id) {
             <article
               [class.hidden-category]="!category.active"
               [style.--depth]="categoryDepth(category.id)"
@@ -393,6 +417,9 @@
           }
         </div>
       </section>
+    }
+    @if (section() === "subcategories") {
+      <app-admin-subcategory-manager />
     }
     @if (section() === "requests") {
       <section class="admin-panel-block request-admin-panel">

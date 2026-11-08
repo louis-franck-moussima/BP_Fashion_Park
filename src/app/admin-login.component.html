@@ -8,7 +8,7 @@
       <p class="intro">Sign in to add products, update prices, manage colors and keep stock availability accurate.</p>
       @if (auth.user()) {
         <div class="already-signed"><span>✓</span><p><strong>You’re already signed in</strong><small>{{ auth.user()?.email }}</small></p></div>
-        <a routerLink="/" class="primary-link">Open the admin workspace</a>
+        <a routerLink="/admin" class="primary-link">Open the admin workspace</a>
       } @else {
         @if (!auth.configured) { <div class="setup-notice"><strong>Firebase setup required</strong><span>Add the Firebase configuration and enable Email/Password authentication to activate this form.</span></div> }
         <form (submit)="submit($event)">

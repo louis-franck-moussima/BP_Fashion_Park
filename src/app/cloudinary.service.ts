@@ -41,8 +41,28 @@ export class CloudinaryService {
     if (!this.configured) return this.localPreviews(files, productName);
     return Promise.all(
       files.map((file, index) =>
-        this.upload(file, `${productName} ${index + 1}`),
+        this.upload(
+          file,
+          `${productName} ${index + 1}`,
+          'bp-fashion-park/products',
+        ),
       ),
+    );
+  }
+
+  async uploadCategory(
+    file: File,
+    categoryName: string,
+  ): Promise<ProductImage> {
+    if (!this.allowedTypes.has(file.type))
+      throw new Error(`${file.name} is not a supported image format.`);
+    if (file.size > this.maximumFileSize)
+      throw new Error(`${file.name} is larger than 8 MB.`);
+    if (!this.configured) return this.localPreviews([file], categoryName)[0];
+    return this.upload(
+      file,
+      `${categoryName} category cover`,
+      'bp-fashion-park/categories',
     );
   }
 
@@ -78,11 +98,15 @@ export class CloudinaryService {
       );
   }
 
-  private async upload(file: File, alt: string): Promise<ProductImage> {
+  private async upload(
+    file: File,
+    alt: string,
+    folder: string,
+  ): Promise<ProductImage> {
     const body = new FormData();
     body.append('file', file);
     body.append('upload_preset', environment.cloudinary.uploadPreset);
-    body.append('folder', 'bp-fashion-park/products');
+    body.append('folder', folder);
     const response = await fetch(
       `https://api.cloudinary.com/v1_1/${environment.cloudinary.cloudName}/image/upload`,
       { method: 'POST', body },

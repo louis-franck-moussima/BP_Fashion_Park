@@ -3,9 +3,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function isAdmin() {
-      // This project has no public registration. Only the owner account is
-      // created in Firebase Authentication.
-      return request.auth != null;
+      // The owner account is created directly in Firebase Authentication.
+      // Public registration is not part of the storefront.
+      return request.auth != null
+        && request.auth.uid == 'v0YcPsjTlzPTonDxnxtxGPBluA82';
     }
 
     function validCategory(categoryId) {
@@ -14,7 +15,7 @@ service cloud.firestore {
           'id', 'name', 'slug', 'description', 'parentCategoryId', 'active', 'displayOrder'
         ])
         && request.resource.data.keys().hasOnly([
-          'id', 'name', 'slug', 'description', 'parentCategoryId', 'active', 'displayOrder', 'imageUrl'
+          'id', 'name', 'slug', 'description', 'parentCategoryId', 'active', 'displayOrder', 'imageUrl', 'imagePublicId', 'imagePosition'
         ])
         && data.id is string && data.id == categoryId && data.id.size() <= 160
         && data.name is string && data.name.size() >= 2 && data.name.size() <= 60
@@ -26,7 +27,9 @@ service cloud.firestore {
             && existsAfter(/databases/$(database)/documents/categories/$(data.parentCategoryId))))
         && data.active is bool
         && data.displayOrder is int && data.displayOrder >= 0
-        && (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() <= 2000));
+        && (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() <= 2000))
+        && (!('imagePublicId' in data) || (data.imagePublicId is string && data.imagePublicId.size() <= 300))
+        && (!('imagePosition' in data) || data.imagePosition in ['center', 'top', 'bottom']);
     }
 
     function validProduct(productId) {

@@ -459,7 +459,11 @@
         >
           <div class="category-visual">
             @if (category.imageUrl) {
-              <img [src]="category.imageUrl" [alt]="category.name" />
+              <img
+                [src]="category.imageUrl"
+                [alt]="category.name"
+                [style.object-position]="category.imagePosition || 'center'"
+              />
             } @else {
               <div
                 class="silhouette"
@@ -1025,11 +1029,11 @@
     <div class="footer-menu">
       <span>Explore</span><a href="/#shop">Shop all</a
       ><a href="/#categories">Collections</a
-      ><a [href]="contactEmailUrl()">Contact us</a>
+      ><a href="/contact">Contact us</a>
     </div>
     <div class="footer-menu">
       <span>Customer care</span
-      ><a [href]="contactEmailUrl()">Product enquiries</a
+      ><a href="/contact">Product enquiries</a
       ><a href="/#newsletter">Join our list</a>
       @if (storeSettings.settings().businessAddress) {
         <p class="footer-detail">

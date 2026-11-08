@@ -113,6 +113,13 @@ export function validateCategory(
     errors.push('Category name must create a valid URL slug.');
   if (category.description.length > 240)
     errors.push('Category description must not exceed 240 characters.');
+  if (category.imageUrl && category.imageUrl.length > 2_000)
+    errors.push('Category image URL is too long.');
+  if (
+    category.imagePosition &&
+    !['center', 'top', 'bottom'].includes(category.imagePosition)
+  )
+    errors.push('Choose a valid category image position.');
   if (!Number.isInteger(category.displayOrder) || category.displayOrder < 0)
     errors.push('Category order must be a positive whole number.');
   if (

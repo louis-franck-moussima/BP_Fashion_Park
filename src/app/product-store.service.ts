@@ -203,9 +203,11 @@ export const DEMO_PRODUCTS: Product[] = [
 export class ProductStore {
   private readonly repository = inject(ProductRepository);
   private initialized = false;
-  readonly products = signal<Product[]>(DEMO_PRODUCTS);
+  readonly products = signal<Product[]>(
+    this.repository.firebaseConfigured ? [] : DEMO_PRODUCTS,
+  );
   readonly firebaseConfigured = this.repository.firebaseConfigured;
-  readonly loading = signal(false);
+  readonly loading = signal(this.firebaseConfigured);
   readonly loadError = signal('');
   readonly stockHistory = signal<StockMovement[]>([]);
   readonly historyLoading = signal(false);

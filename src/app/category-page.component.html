@@ -16,7 +16,15 @@
       <a routerLink="/">Return home</a>
     </section>
   } @else if (category(); as current) {
-    <section class="category-hero">
+    <section class="category-hero" [class.has-cover]="current.imageUrl">
+      @if (current.imageUrl) {
+        <img
+          class="category-hero-cover"
+          [src]="current.imageUrl"
+          [alt]="current.name"
+          [style.object-position]="current.imagePosition || 'center'"
+        />
+      }
       <nav class="breadcrumbs" aria-label="Breadcrumb">
         <a routerLink="/">Home</a>
         @for (item of breadcrumbs(); track item.id; let last = $last) {
@@ -48,8 +56,20 @@
         </div>
         <div class="subcategory-grid">
           @for (child of children(); track child.id; let i = $index) {
-            <a [routerLink]="categoryUrl(child.id)" [style.--tone]="i"
-              ><span>0{{ i + 1 }}</span>
+            <a
+              [routerLink]="categoryUrl(child.id)"
+              [style.--tone]="i"
+              [class.has-cover]="child.imageUrl"
+            >
+              @if (child.imageUrl) {
+                <img
+                  class="subcategory-cover"
+                  [src]="child.imageUrl"
+                  [alt]="child.name"
+                  [style.object-position]="child.imagePosition || 'center'"
+                />
+              }
+              <span>0{{ i + 1 }}</span>
               <div>
                 <h3>{{ child.name }}</h3>
                 <p>{{ child.description }}</p>

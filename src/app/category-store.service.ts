@@ -63,8 +63,10 @@ export const STARTER_CATEGORIES: Category[] = [
 export class CategoryStore {
   private readonly repository = inject(CategoryRepository);
   private initialized = false;
-  readonly categories = signal<Category[]>(STARTER_CATEGORIES);
-  readonly loading = signal(false);
+  readonly categories = signal<Category[]>(
+    this.repository.configured ? [] : STARTER_CATEGORIES,
+  );
+  readonly loading = signal(this.repository.configured);
   readonly loadError = signal('');
   readonly active = computed(() => {
     const categories = this.categories();

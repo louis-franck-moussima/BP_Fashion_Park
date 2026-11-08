@@ -19,6 +19,14 @@ export class SeoService {
     );
   }
 
+  setContact(): void {
+    this.apply(
+      `Contact & Location | ${this.brand}`,
+      'Contact BP Fashion Park about product availability, sizing, delivery and visiting the shop.',
+      'website',
+    );
+  }
+
   setCategory(category: Category, path: Category[]): void {
     const pathLabel = path.map((item) => item.name).join(' · ');
     const description =

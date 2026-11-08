@@ -22,13 +22,13 @@ export const deleteCloudinaryImage = onCall(
       typeof request.data?.publicId === 'string'
         ? request.data.publicId.trim()
         : '';
-    if (
-      !publicId.startsWith('bp-fashion-park/products/') ||
-      publicId.length > 300
-    ) {
+    const allowedFolder =
+      publicId.startsWith('bp-fashion-park/products/') ||
+      publicId.startsWith('bp-fashion-park/categories/');
+    if (!allowedFolder || publicId.length > 300) {
       throw new HttpsError(
         'invalid-argument',
-        'Invalid product image identifier.',
+        'Invalid BP Fashion Park image identifier.',
       );
     }
     cloudinary.config({

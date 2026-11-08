@@ -1,0 +1,57 @@
+<section class="subcategory-manager">
+  <div class="subcategory-layout">
+    <form #subcategoryForm class="subcategory-form" (submit)="save($event)">
+      <div class="form-heading">
+        <span>{{ editingId() ? "Edit subcategory" : "New subcategory" }}</span>
+        <h2>{{ editingId() ? "Update its details" : "Place it under a category" }}</h2>
+      </div>
+      <label>Parent
+        <select name="parentCategoryId" required>
+          <option value="" disabled selected>Select a parent</option>
+          @for (category of availableParents(); track category.id) {
+            <option [value]="category.id">{{ categoryStore.pathLabel(category.id) }}</option>
+          }
+        </select>
+        <small>You can select a category or another subcategory.</small>
+      </label>
+      <label>Name<input name="name" required minlength="2" maxlength="60" placeholder="e.g. Training shoes" /></label>
+      <label>Description<input name="description" maxlength="240" placeholder="Short storefront description" /></label>
+      <button type="submit" [disabled]="saving()">{{ saving() ? "Saving…" : editingId() ? "Save changes" : "Add subcategory" }}</button>
+      @if (editingId()) {
+        <button type="button" class="secondary" (click)="cancel(subcategoryForm)">Cancel editing</button>
+      }
+      @if (error()) { <p class="form-message error" role="alert">{{ error() }}</p> }
+      @if (notice()) { <p class="form-message success" role="status">{{ notice() }}</p> }
+    </form>
+
+    <div class="subcategory-list-panel">
+      <header>
+        <div><span>Subcategory directory</span><h2>Manage independently</h2></div>
+        <label>Show branch
+          <select [value]="selectedBranch()" (change)="selectedBranch.set($any($event.target).value)">
+            <option value="all">All categories</option>
+            @for (root of roots(); track root.id) { <option [value]="root.id">{{ root.name }}</option> }
+          </select>
+        </label>
+      </header>
+      <div class="subcategory-list">
+        @for (category of subcategories(); track category.id) {
+          <article [class.inactive]="!category.active">
+            <div class="subcategory-name">
+              <small>{{ categoryStore.pathLabel(category.id) }}</small>
+              <strong>{{ category.name }}</strong>
+              <span>{{ productCount(category) }} products</span>
+            </div>
+            <div class="subcategory-actions">
+              <button (click)="toggle(category)" [class.visible]="category.active">{{ category.active ? "Active" : "Inactive" }}</button>
+              <button (click)="edit(category)">Edit</button>
+              <button class="danger" (click)="remove(category)">Delete</button>
+            </div>
+          </article>
+        } @empty {
+          <div class="empty-subcategories"><strong>No subcategories in this branch</strong><p>Create one with the form.</p></div>
+        }
+      </div>
+    </div>
+  </div>
+</section>

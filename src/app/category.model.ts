@@ -7,4 +7,6 @@ export interface Category {
   active: boolean;
   displayOrder: number;
   imageUrl?: string;
+  imagePublicId?: string;
+  imagePosition?: 'center' | 'top' | 'bottom';
 }

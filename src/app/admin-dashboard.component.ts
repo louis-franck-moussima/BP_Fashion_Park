@@ -7,7 +7,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AdminAuthService } from './admin-auth.service';
 import { CategoryStore } from './category-store.service';
 import { ProductStore } from './product-store.service';
@@ -29,17 +29,24 @@ import {
 } from './customer-request.model';
 import { StoreSettingsService } from './store-settings.service';
 import { StoreSettings } from './store-settings.model';
+import { AdminSubcategoryManagerComponent } from './admin-subcategory-manager.component';
 
 type AdminSection =
-  'overview' | 'products' | 'categories' | 'requests' | 'settings';
+  | 'overview'
+  | 'products'
+  | 'categories'
+  | 'subcategories'
+  | 'requests'
+  | 'settings';
 
 @Component({
   selector: 'app-admin-dashboard',
-  imports: [RouterLink],
+  imports: [RouterLink, AdminSubcategoryManagerComponent],
   templateUrl: './admin-dashboard.component.html',
   styleUrls: [
     './admin-dashboard.component.css',
     './admin-dashboard-editor.component.css',
+    './admin-category-form.component.css',
     './admin-category-visibility.component.css',
   ],
 })
@@ -50,6 +57,7 @@ export class AdminDashboardComponent implements OnInit {
   readonly requestStore = inject(CustomerRequestStore);
   readonly storeSettings = inject(StoreSettingsService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly cloudinary = inject(CloudinaryService);
   readonly section = signal<AdminSection>('overview');
   readonly sectionTitle = computed(
@@ -58,6 +66,7 @@ export class AdminDashboardComponent implements OnInit {
         overview: 'Dashboard',
         products: 'Products',
         categories: 'Categories',
+        subcategories: 'Subcategories',
         requests: 'Customer requests',
         settings: 'Store settings',
       })[this.section()],
@@ -105,12 +114,25 @@ export class AdminDashboardComponent implements OnInit {
   readonly requestActionId = signal<string | null>(null);
   readonly requestError = signal('');
   readonly categoryError = signal('');
+  readonly pendingCategoryImage = signal<ProductImage | null>(null);
+  readonly categoryImageToDelete = signal<ProductImage | null>(null);
+  readonly categoryUploadedThisSession = signal<ProductImage | null>(null);
+  readonly categoryImageUploading = signal(false);
   readonly editingCategoryId = signal<string | null>(null);
+  readonly categoryKind = signal<'category' | 'subcategory'>('category');
   readonly importingStarterCategories = signal(false);
   readonly allCategories = computed(() =>
     [...this.categoryStore.categories()].sort(
       (a, b) => a.displayOrder - b.displayOrder,
     ),
+  );
+  readonly mainCategories = computed(() =>
+    this.allCategories().filter((category) => !category.parentCategoryId),
+  );
+  readonly subcategoryCount = computed(
+    () =>
+      this.categoryStore.categories().filter((category) => category.parentCategoryId)
+        .length,
   );
   readonly availableCategoryParents = computed(() => {
     const editingId = this.editingCategoryId();
@@ -133,6 +155,23 @@ export class AdminDashboardComponent implements OnInit {
   constructor() {
     effect(() => {
       if (this.auth.user()) void this.requestStore.initialize();
+    });
+    this.route.queryParamMap.subscribe((params) => {
+      const requested = params.get('section') as AdminSection | null;
+      if (
+        requested &&
+        ['overview', 'products', 'categories', 'subcategories', 'requests', 'settings'].includes(requested)
+      )
+        this.section.set(requested);
+    });
+  }
+
+  selectSection(section: AdminSection): void {
+    this.section.set(section);
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: section === 'overview' ? {} : { section },
+      replaceUrl: true,
     });
   }
 
@@ -555,7 +594,14 @@ export class AdminDashboardComponent implements OnInit {
     }
     const data = new FormData(form);
     const name = String(data.get('name') || '').trim();
-    const parentCategoryId = String(data.get('parentCategoryId') || '') || null;
+    const parentCategoryId =
+      this.categoryKind() === 'subcategory'
+        ? String(data.get('parentCategoryId') || '') || null
+        : null;
+    if (this.categoryKind() === 'subcategory' && !parentCategoryId) {
+      this.categoryError.set('Choose the parent for this subcategory.');
+      return;
+    }
     const slug = this.slugify(name);
     const existing = this.editingCategoryId()
       ? this.categoryStore.find(this.editingCategoryId()!)
@@ -571,7 +617,17 @@ export class AdminDashboardComponent implements OnInit {
       active: existing?.active ?? true,
       displayOrder:
         existing?.displayOrder ?? this.categoryStore.categories().length + 1,
-      ...(existing?.imageUrl ? { imageUrl: existing.imageUrl } : {}),
+      ...(this.pendingCategoryImage()
+        ? {
+            imageUrl: this.pendingCategoryImage()!.url,
+            ...(this.pendingCategoryImage()!.publicId
+              ? { imagePublicId: this.pendingCategoryImage()!.publicId }
+              : {}),
+            imagePosition: String(
+              data.get('imagePosition') || 'center',
+            ) as Category['imagePosition'],
+          }
+        : {}),
     };
     const validationErrors = validateCategory(
       category,
@@ -583,8 +639,14 @@ export class AdminDashboardComponent implements OnInit {
     }
     try {
       await this.categoryStore.save(category);
+      if (this.categoryImageToDelete())
+        await this.cloudinary.deleteImages([this.categoryImageToDelete()!]);
       form.reset();
+      this.categoryKind.set('category');
       this.editingCategoryId.set(null);
+      this.pendingCategoryImage.set(null);
+      this.categoryImageToDelete.set(null);
+      this.categoryUploadedThisSession.set(null);
       this.categoryError.set('');
       this.notify(`Category “${category.name}” saved successfully.`);
     } catch (error) {
@@ -598,7 +660,21 @@ export class AdminDashboardComponent implements OnInit {
   editCategory(category: Category): void {
     if (!this.auth.user()) return;
     this.editingCategoryId.set(category.id);
+    this.categoryKind.set(
+      category.parentCategoryId ? 'subcategory' : 'category',
+    );
     this.categoryError.set('');
+    this.pendingCategoryImage.set(
+      category.imageUrl
+        ? {
+            url: category.imageUrl,
+            publicId: category.imagePublicId,
+            alt: `${category.name} category cover`,
+          }
+        : null,
+    );
+    this.categoryImageToDelete.set(null);
+    this.categoryUploadedThisSession.set(null);
     setTimeout(() => {
       const form = document.querySelector<HTMLFormElement>(
         '.dashboard-category-form',
@@ -606,19 +682,86 @@ export class AdminDashboardComponent implements OnInit {
       if (!form) return;
       (form.elements.namedItem('name') as HTMLInputElement).value =
         category.name;
-      (form.elements.namedItem('parentCategoryId') as HTMLSelectElement).value =
-        category.parentCategoryId ?? '';
+      const parent = form.elements.namedItem(
+        'parentCategoryId',
+      ) as HTMLSelectElement | null;
+      if (parent) parent.value = category.parentCategoryId ?? '';
       (form.elements.namedItem('description') as HTMLInputElement).value =
         category.description;
+      (form.elements.namedItem('imagePosition') as HTMLSelectElement).value =
+        category.imagePosition ?? 'center';
       form.querySelector<HTMLInputElement>('input[name="name"]')?.focus();
     });
   }
   cancelCategoryEdit(): void {
+    if (this.categoryUploadedThisSession())
+      void this.cloudinary
+        .deleteImages([this.categoryUploadedThisSession()!])
+        .catch((error) =>
+          this.notify(
+            error instanceof Error
+              ? error.message
+              : 'Unused category image could not be deleted.',
+            true,
+          ),
+        );
     this.editingCategoryId.set(null);
+    this.categoryKind.set('category');
     this.categoryError.set('');
+    this.pendingCategoryImage.set(null);
+    this.categoryImageToDelete.set(null);
+    this.categoryUploadedThisSession.set(null);
     document
       .querySelector<HTMLFormElement>('.dashboard-category-form')
       ?.reset();
+  }
+  async selectCategoryImage(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    this.categoryImageUploading.set(true);
+    this.categoryError.set('');
+    try {
+      const form = document.querySelector<HTMLFormElement>(
+        '.dashboard-category-form',
+      );
+      const name =
+        (form?.elements.namedItem('name') as HTMLInputElement | null)?.value ||
+        'Category';
+      const current = this.pendingCategoryImage();
+      const uploaded = await this.cloudinary.uploadCategory(file, name);
+      if (
+        current?.publicId &&
+        current.publicId !== this.categoryUploadedThisSession()?.publicId
+      )
+        this.categoryImageToDelete.set(current);
+      if (this.categoryUploadedThisSession()?.publicId)
+        await this.cloudinary.deleteImages([
+          this.categoryUploadedThisSession()!,
+        ]);
+      this.pendingCategoryImage.set(uploaded);
+      this.categoryUploadedThisSession.set(uploaded);
+    } catch (error) {
+      this.categoryError.set(
+        error instanceof Error
+          ? error.message
+          : 'Category image upload failed.',
+      );
+    } finally {
+      this.categoryImageUploading.set(false);
+      input.value = '';
+    }
+  }
+  removeCategoryImage(): void {
+    const current = this.pendingCategoryImage();
+    if (
+      !current ||
+      (typeof window !== 'undefined' &&
+        !window.confirm('Remove this category cover image?'))
+    )
+      return;
+    this.categoryImageToDelete.set(current);
+    this.pendingCategoryImage.set(null);
   }
   async toggleCategory(category: Category): Promise<void> {
     if (this.auth.user())
@@ -708,9 +851,31 @@ export class AdminDashboardComponent implements OnInit {
     )
       return;
     try {
+      const categoryImages = [
+        category,
+        ...this.categoryStore.descendants(category.id),
+      ]
+        .filter((item) => item.imageUrl)
+        .map((item) => ({
+          url: item.imageUrl!,
+          publicId: item.imagePublicId,
+          alt: `${item.name} category cover`,
+        }));
       await this.categoryStore.remove(category.id);
       this.categoryError.set('');
-      this.notify(`Category “${category.name}” deleted.`);
+      let cleanupWarning = '';
+      try {
+        await this.cloudinary.deleteImages(categoryImages);
+      } catch (error) {
+        cleanupWarning =
+          error instanceof Error ? error.message : 'Cloudinary cleanup failed.';
+      }
+      this.notify(
+        cleanupWarning
+          ? `Category deleted, but ${cleanupWarning}`
+          : `Category “${category.name}” deleted.`,
+        Boolean(cleanupWarning),
+      );
     } catch (error) {
       this.categoryError.set(
         error instanceof Error
