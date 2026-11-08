@@ -1,0 +1,16 @@
+{
+  "name": "bp-fashion-park-functions",
+  "private": true,
+  "main": "lib/index.js",
+  "engines": { "node": "22" },
+  "scripts": {
+    "build": "tsc",
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "cloudinary": "latest",
+    "firebase-admin": "latest",
+    "firebase-functions": "latest"
+  },
+  "devDependencies": { "typescript": "latest" }
+}

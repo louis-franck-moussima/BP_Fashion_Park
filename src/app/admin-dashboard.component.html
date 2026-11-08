@@ -19,7 +19,17 @@
         (click)="section.set('categories')"
       >
         <span>⌘</span> Categories
-        <small>{{ categoryStore.categories().length }}</small>
+        <small>{{ categoryStore.categories().length }}</small></button
+      ><button
+        [class.active]="section() === 'requests'"
+        (click)="section.set('requests')"
+      >
+        <span>✉</span> Requests <small>{{ newRequestCount() }}</small></button
+      ><button
+        [class.active]="section() === 'settings'"
+        (click)="section.set('settings')"
+      >
+        <span>⚙</span> Settings
       </button>
     </nav>
     <div class="sidebar-bottom">
@@ -35,15 +45,7 @@
     <header class="admin-topbar">
       <div>
         <p>BP Fashion Park</p>
-        <h1>
-          {{
-            section() === "overview"
-              ? "Dashboard"
-              : section() === "products"
-                ? "Products"
-                : "Categories"
-          }}
-        </h1>
+        <h1>{{ sectionTitle() }}</h1>
       </div>
       <div
         class="admin-status"
@@ -55,6 +57,15 @@
         }}</span>
       </div>
     </header>
+    @if (adminNotice()) {
+      <div
+        class="admin-notice"
+        [class.error]="adminNoticeError()"
+        role="status"
+      >
+        {{ adminNotice() }}
+      </div>
+    }
     @if (catalogLoading()) {
       <div class="catalog-status" role="status">
         <span></span>
@@ -136,7 +147,7 @@
         </article>
         <article>
           <span>Inventory value</span
-          ><strong>€{{ inventoryValue().toFixed(0) }}</strong
+          ><strong>{{ inventoryValueLabel() }}</strong
           ><small>Estimated at retail price</small>
         </article>
       </div>
@@ -161,7 +172,10 @@
                 } @else {
                   <i>{{ product.name.charAt(0) }}</i>
                 }
-                <strong>{{ product.name }}</strong></span
+                <strong
+                  >{{ product.name
+                  }}<small>{{ product.sku || "No SKU" }}</small></strong
+                ></span
               ><span>{{ categoryName(product.category) }}</span
               ><span>{{ priceLabel(product) }}</span
               ><span>{{ stockOf(product) }}</span
@@ -169,11 +183,11 @@
                 ><b
                   class="stock-status"
                   [class.out]="stockOf(product) === 0"
-                  [class.low]="stockOf(product) > 0 && stockOf(product) <= 3"
+                  [class.low]="isLowStock(product)"
                   >{{
                     stockOf(product) === 0
                       ? "Out of stock"
-                      : stockOf(product) <= 3
+                      : isLowStock(product)
                         ? "Low stock"
                         : "Available"
                   }}</b
@@ -200,6 +214,9 @@
             ＋ Add product
           </button>
         </div>
+        @if (inventoryError()) {
+          <p class="dashboard-error">{{ inventoryError() }}</p>
+        }
         <div class="admin-table">
           <div class="table-row table-head">
             <span>Product</span><span>Category</span><span>Price</span
@@ -213,10 +230,34 @@
                 } @else {
                   <i>{{ product.name.charAt(0) }}</i>
                 }
-                <strong>{{ product.name }}</strong></span
+                <strong
+                  >{{ product.name
+                  }}<small>{{ product.sku || "No SKU" }}</small></strong
+                ></span
               ><span>{{ categoryName(product.category) }}</span
               ><span>{{ priceLabel(product) }}</span
-              ><span>{{ stockOf(product) }}</span
+              ><span class="stock-adjuster"
+                ><strong>{{ stockOf(product) }}</strong
+                ><button
+                  (click)="adjustStock(product, -1, 'decrease')"
+                  [disabled]="
+                    !auth.user() || stockActionId() || stockOf(product) === 0
+                  "
+                  aria-label="Remove one unit"
+                >
+                  −1</button
+                ><button
+                  (click)="adjustStock(product, 1, 'increase')"
+                  [disabled]="!auth.user() || stockActionId()"
+                  aria-label="Add one unit"
+                >
+                  +1</button
+                ><button
+                  (click)="restockProduct(product)"
+                  [disabled]="!auth.user() || stockActionId()"
+                >
+                  Restocked
+                </button></span
               ><span
                 ><button
                   class="row-action"
@@ -224,6 +265,13 @@
                   [disabled]="!auth.user()"
                 >
                   Edit
+                </button>
+                <button
+                  class="row-action"
+                  (click)="duplicateProduct(product)"
+                  [disabled]="!auth.user()"
+                >
+                  Duplicate
                 </button></span
               >
             </div>
@@ -242,6 +290,9 @@
         </div>
         @if (auth.user()) {
           <form class="dashboard-category-form" (submit)="addCategory($event)">
+            @if (editingCategoryId()) {
+              <p class="category-edit-label">Editing category</p>
+            }
             <label
               >Name<input
                 name="name"
@@ -252,7 +303,10 @@
             ><label
               >Parent<select name="parentCategoryId">
                 <option value="">None — main category</option>
-                @for (category of allCategories(); track category.id) {
+                @for (
+                  category of availableCategoryParents();
+                  track category.id
+                ) {
                   <option [value]="category.id">
                     {{ categoryStore.pathLabel(category.id) }}
                   </option>
@@ -263,7 +317,18 @@
                 name="description"
                 maxlength="240"
                 placeholder="Short storefront description" /></label
-            ><button type="submit">Add category</button>
+            ><button type="submit">
+              {{ editingCategoryId() ? "Save category" : "Add category" }}
+            </button>
+            @if (editingCategoryId()) {
+              <button
+                class="category-cancel"
+                type="button"
+                (click)="cancelCategoryEdit()"
+              >
+                Cancel editing
+              </button>
+            }
           </form>
         }
         @if (categoryError()) {
@@ -300,6 +365,11 @@
                     category.active ? "Shown in store" : "Hidden from store"
                   }}</small></label
                 ><button
+                  (click)="editCategory(category)"
+                  [disabled]="!auth.user()"
+                >
+                  Edit</button
+                ><button
                   (click)="moveCategory(category, -1)"
                   [disabled]="!auth.user()"
                   aria-label="Move category up"
@@ -324,6 +394,174 @@
         </div>
       </section>
     }
+    @if (section() === "requests") {
+      <section class="admin-panel-block request-admin-panel">
+        <div class="block-heading">
+          <div>
+            <span>Customer enquiries</span>
+            <h2>Availability requests</h2>
+          </div>
+        </div>
+        @if (requestStore.loading()) {
+          <div class="catalog-status" role="status">
+            <span></span>
+            <div>
+              <strong>Loading requests</strong>
+              <p>Retrieving customer enquiries from Firebase.</p>
+            </div>
+          </div>
+        }
+        @if (requestStore.error() || requestError()) {
+          <p class="dashboard-error">
+            {{ requestError() || requestStore.error() }}
+          </p>
+        }
+        <div class="request-admin-list">
+          @for (request of requestStore.requests(); track request.id) {
+            <article>
+              <header>
+                <div>
+                  <span>{{ request.reference }}</span
+                  ><strong>{{ request.name }}</strong
+                  ><small
+                    >{{ requestDate(request.createdAt) }} · {{ request.city }} ·
+                    {{ request.phone }}</small
+                  >
+                </div>
+                <select
+                  [value]="request.status"
+                  (change)="
+                    updateRequestStatus(request, $any($event.target).value)
+                  "
+                  [disabled]="requestActionId() === request.id"
+                >
+                  <option value="new">New</option>
+                  <option value="contacted">Contacted</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="closed">Closed</option>
+                </select>
+              </header>
+              @if (request.message) {
+                <p>{{ request.message }}</p>
+              }
+              <div class="request-admin-items">
+                @for (
+                  item of request.items;
+                  track item.productId + item.color + item.size
+                ) {
+                  <span
+                    ><b>{{ item.quantity }}×</b> {{ item.name }} ·
+                    {{ item.color }}
+                    @if (item.size) {
+                      · {{ item.size }}
+                    }
+                    <small>{{ item.priceLabel }}</small></span
+                  >
+                }
+              </div>
+            </article>
+          } @empty {
+            @if (!requestStore.loading()) {
+              <div class="category-empty">
+                <span>◇</span>
+                <h3>No customer requests yet.</h3>
+                <p>New request-bag enquiries will appear here.</p>
+              </div>
+            }
+          }
+        </div>
+      </section>
+    }
+    @if (section() === "settings") {
+      <section class="admin-panel-block store-settings-panel">
+        <div class="block-heading">
+          <div>
+            <span>Store configuration</span>
+            <h2>Contact and storefront settings</h2>
+          </div>
+        </div>
+        @if (storeSettings.error()) {
+          <p class="dashboard-error">{{ storeSettings.error() }}</p>
+        }
+        <form class="store-settings-form" (submit)="saveStoreSettings($event)">
+          <div class="editor-form-row">
+            <label
+              >WhatsApp number<input
+                name="whatsappNumber"
+                [value]="storeSettings.settings().whatsappNumber"
+                maxlength="20"
+                placeholder="33612345678"
+              /><small>International format without the + symbol.</small></label
+            ><label
+              >Contact email<input
+                name="contactEmail"
+                type="email"
+                required
+                maxlength="120"
+                [value]="storeSettings.settings().contactEmail"
+            /></label>
+          </div>
+          <label
+            >Instagram URL<input
+              name="instagramUrl"
+              type="url"
+              maxlength="300"
+              [value]="storeSettings.settings().instagramUrl"
+              placeholder="https://www.instagram.com/bpfashionpark"
+          /></label>
+          <label
+            >Business address<textarea
+              name="businessAddress"
+              rows="3"
+              maxlength="300"
+              >{{ storeSettings.settings().businessAddress }}</textarea>
+          </label>
+          <label
+            >Delivery information<textarea
+              name="deliveryInformation"
+              rows="4"
+              maxlength="600"
+              >{{ storeSettings.settings().deliveryInformation }}</textarea>
+          </label>
+          <div class="editor-form-row">
+            <label
+              >Currency<select
+                name="currency"
+                [value]="storeSettings.settings().currency"
+              >
+                <option value="EUR">EUR — Euro</option>
+                <option value="USD">USD — US Dollar</option>
+                <option value="GBP">GBP — British Pound</option>
+                <option value="XOF">XOF — West African CFA</option>
+                <option value="CDF">CDF — Congolese Franc</option>
+              </select></label
+            ><label
+              >Default language<select
+                name="defaultLanguage"
+                [value]="storeSettings.settings().defaultLanguage"
+              >
+                <option value="en">English</option>
+                <option value="fr">Français</option>
+              </select></label
+            >
+          </div>
+          <label
+            >Homepage announcement<input
+              name="announcementText"
+              required
+              maxlength="140"
+              [value]="storeSettings.settings().announcementText"
+              placeholder="New arrivals every week"
+          /></label>
+          @if (settingsMessage()) {
+            <p class="settings-message">{{ settingsMessage() }}</p>
+          }
+          <button type="submit" [disabled]="savingSettings() || !auth.user()">
+            {{ savingSettings() ? "Saving…" : "Save store settings" }}
+          </button>
+        </form>
+      </section>
+    }
   </section>
 </main>
 @if (productEditorOpen()) {
@@ -338,7 +576,12 @@
         ×
       </button>
     </header>
-    <form class="dashboard-product-form" (submit)="saveProduct($event)">
+    <form
+      class="dashboard-product-form"
+      (submit)="saveProduct($event)"
+      (input)="markProductDirty()"
+      (change)="markProductDirty()"
+    >
       <label
         >Product name<input
           name="name"
@@ -347,6 +590,16 @@
           maxlength="100"
           placeholder="e.g. Riviera jacket"
       /></label>
+      <label
+        >Product reference / SKU<input
+          name="sku"
+          required
+          minlength="2"
+          maxlength="40"
+          pattern="[A-Za-z0-9][A-Za-z0-9._-]{1,39}"
+          placeholder="e.g. WIG-CURLY-001"
+        /><small>Unique supplier or internal reference.</small></label
+      >
       <div class="editor-form-row">
         <label
           >Category<select name="category" required>
@@ -366,7 +619,7 @@
       </div>
       <div class="editor-form-row">
         <label
-          >Base price (€)<input
+          >Current price<input
             name="price"
             type="number"
             min="0"
@@ -375,25 +628,76 @@
             required
             value="0"
           /><small>Used for fixed and “starting at” prices.</small></label
-        ><label class="dashboard-featured"
-          ><input name="negotiable" type="checkbox" /> Price is
-          negotiable</label
+        ><label
+          >Original price<input
+            name="originalPrice"
+            type="number"
+            min="0"
+            max="1000000"
+            step="0.01"
+            placeholder="Optional"
+          /><small
+            >Shown crossed out when higher than the current price.</small
+          ></label
         >
       </div>
-      <label
-        >Stock quantity<input
-          name="stock"
-          type="number"
-          min="0"
-          max="100000"
-          step="1"
-          required
-          value="0"
-        /><small
-          >Total quantity available for this product, independent of its
-          colors.</small
-        ></label
-      >
+      <div class="editor-form-row">
+        <label
+          >Stock quantity<input
+            name="stock"
+            type="number"
+            min="0"
+            max="100000"
+            step="1"
+            required
+            value="0"
+            [readonly]="!!editingProductId()"
+          /><small>{{
+            editingProductId()
+              ? "Use the inventory controls to change existing stock."
+              : "Initial quantity for this new product."
+          }}</small></label
+        ><label
+          >Low-stock threshold<input
+            name="lowStockThreshold"
+            type="number"
+            min="0"
+            max="100000"
+            step="1"
+            required
+            value="3"
+          /><small
+            >Show a low-stock warning at or below this quantity.</small
+          ></label
+        >
+      </div>
+      @if (editingProductId()) {
+        <section class="stock-history">
+          <div>
+            <strong>Stock history</strong><small>Last 30 changes</small>
+          </div>
+          @if (productStore.historyLoading()) {
+            <p>Loading stock history…</p>
+          }
+          @if (productStore.historyError()) {
+            <p class="dashboard-error">{{ productStore.historyError() }}</p>
+          }
+          @for (movement of productStore.stockHistory(); track movement.id) {
+            <article>
+              <span
+                ><strong>{{ movementLabel(movement) }}</strong
+                ><small>{{ movementDate(movement.createdAt) }}</small></span
+              ><b [class.negative]="movement.delta < 0"
+                >{{ movement.delta > 0 ? "+" : "" }}{{ movement.delta }}</b
+              ><em>{{ movement.previousStock }} → {{ movement.newStock }}</em>
+            </article>
+          } @empty {
+            @if (!productStore.historyLoading()) {
+              <p>No stock changes recorded yet.</p>
+            }
+          }
+        </section>
+      }
       <label
         >Display style<select name="art">
           <option value="dress">Clothing</option>
@@ -476,6 +780,38 @@
           Separate values with commas.</small
         ></label
       >
+      <section class="wig-fields">
+        <div>
+          <strong>Wig details</strong
+          ><small>Optional fields for wig products</small>
+        </div>
+        <div class="editor-form-row">
+          <label
+            >Length<input
+              name="wigLength"
+              maxlength="80"
+              placeholder="e.g. 18 inches" /></label
+          ><label
+            >Texture<input
+              name="wigTexture"
+              maxlength="80"
+              placeholder="e.g. Body wave"
+          /></label>
+        </div>
+        <div class="editor-form-row">
+          <label
+            >Lace type<input
+              name="wigLaceType"
+              maxlength="80"
+              placeholder="e.g. 13×4 frontal" /></label
+          ><label
+            >Density<input
+              name="wigDensity"
+              maxlength="80"
+              placeholder="e.g. 180%"
+          /></label>
+        </div>
+      </section>
       <div class="editor-form-row">
         <label
           >Audience<input
@@ -500,9 +836,41 @@
           >Optional searchable labels. Separate tags with commas.</small
         ></label
       >
-      <label class="dashboard-featured"
-        ><input name="featured" type="checkbox" /> Feature this product</label
-      >
+      <section class="related-product-field">
+        <div>
+          <strong>Related products</strong
+          ><small>Optional · choose up to 8 products</small>
+        </div>
+        <div>
+          @for (related of products(); track related.id) {
+            @if (related.id !== editingProductId()) {
+              <label
+                ><input
+                  type="checkbox"
+                  name="relatedProductIds"
+                  [value]="related.id"
+                /><span>{{ related.name }}</span
+                ><small>{{
+                  related.sku || categoryName(related.category)
+                }}</small></label
+              >
+            }
+          }
+        </div>
+      </section>
+      <div class="product-flags">
+        <label class="dashboard-featured"
+          ><input name="newArrival" type="checkbox" /> New arrival</label
+        ><label class="dashboard-featured"
+          ><input name="featured" type="checkbox" /> Featured</label
+        ><label class="dashboard-featured"
+          ><input name="limitedQuantity" type="checkbox" /> Limited
+          quantity</label
+        ><label class="dashboard-featured"
+          ><input name="negotiable" type="checkbox" /> Price is
+          negotiable</label
+        >
+      </div>
       @if (formError()) {
         <p class="dashboard-error">{{ formError() }}</p>
       }
@@ -514,6 +882,13 @@
         {{ savingProduct() ? "Saving…" : "Save product" }}
       </button>
       @if (editingProductId()) {
+        <button
+          class="editor-duplicate"
+          type="button"
+          (click)="duplicateEditingProduct()"
+        >
+          Duplicate as new product
+        </button>
         <button class="editor-delete" type="button" (click)="deleteProduct()">
           Delete product
         </button>

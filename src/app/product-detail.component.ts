@@ -7,11 +7,12 @@ import {
   signal,
 } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { ProductColor, productPriceLabel, totalStock } from './product.model';
+import { Product, ProductColor, totalStock } from './product.model';
 import { ProductStore } from './product-store.service';
 import { CategoryStore } from './category-store.service';
 import { CartService } from './cart.service';
 import { SeoService } from './seo.service';
+import { StoreSettingsService } from './store-settings.service';
 
 @Component({
   selector: 'app-product-detail',
@@ -27,6 +28,7 @@ export class ProductDetailComponent implements OnInit {
   readonly store = inject(ProductStore);
   readonly categoryStore = inject(CategoryStore);
   readonly cart = inject(CartService);
+  readonly storeSettings = inject(StoreSettingsService);
   private readonly seo = inject(SeoService);
   readonly catalogLoading = computed(
     () => this.store.loading() || this.categoryStore.loading(),
@@ -47,10 +49,26 @@ export class ProductDetailComponent implements OnInit {
   readonly totalStock = computed(() =>
     this.product() ? totalStock(this.product()!) : 0,
   );
-  readonly priceLabel = productPriceLabel;
+  priceLabel(product: Product): string {
+    return this.storeSettings.priceLabel(product);
+  }
+  originalPriceLabel(product: Product): string {
+    return product.originalPrice
+      ? this.storeSettings.formatMoney(product.originalPrice)
+      : '';
+  }
   readonly recommendations = computed(() => {
     const current = this.product();
     if (!current) return [];
+    if (current.relatedProductIds?.length) {
+      return current.relatedProductIds
+        .map((id) => this.store.find(id))
+        .filter(
+          (item) =>
+            Boolean(item) && this.categoryStore.isVisible(item!.category),
+        )
+        .slice(0, 4) as Product[];
+    }
     const currentColors = new Set(
       current.colors.map((color) => color.name.toLowerCase()),
     );
@@ -102,6 +120,7 @@ export class ProductDetailComponent implements OnInit {
     await Promise.all([
       this.store.initialize(),
       this.categoryStore.initialize(),
+      this.storeSettings.initialize(),
     ]);
     this.selectInitialColor();
     this.selectInitialSize();

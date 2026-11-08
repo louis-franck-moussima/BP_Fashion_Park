@@ -10,7 +10,6 @@ import {
   Product,
   ProductCategory,
   ProductImage,
-  productPriceLabel,
   totalStock,
 } from './product.model';
 import { CloudinaryService } from './cloudinary.service';
@@ -22,6 +21,9 @@ import { CategoryStore } from './category-store.service';
 import { Category } from './category.model';
 import { CartService } from './cart.service';
 import { SeoService } from './seo.service';
+import { CustomerRequestStore } from './customer-request-store.service';
+import { CustomerRequest } from './customer-request.model';
+import { StoreSettingsService } from './store-settings.service';
 
 type CategoryFilter = 'All' | ProductCategory;
 type SortOption = 'featured' | 'price-low' | 'price-high' | 'newest';
@@ -41,6 +43,8 @@ export class App implements OnInit, OnDestroy {
   readonly auth = inject(AdminAuthService);
   readonly categoryStore = inject(CategoryStore);
   readonly cart = inject(CartService);
+  readonly customerRequests = inject(CustomerRequestStore);
+  readonly storeSettings = inject(StoreSettingsService);
   private readonly seo = inject(SeoService);
   readonly menuOpen = signal(false);
   readonly mobileMenuPath = signal<string[]>([]);
@@ -56,6 +60,13 @@ export class App implements OnInit, OnDestroy {
   readonly adminOpen = signal(false);
   readonly categoryAdminOpen = signal(false);
   readonly categoryError = signal('');
+  readonly requestSubmitting = signal(false);
+  readonly requestError = signal('');
+  readonly submittedRequest = signal<CustomerRequest | null>(null);
+  readonly requestWhatsappUrl = computed(() => {
+    const request = this.submittedRequest();
+    return request ? this.cart.whatsappUrlFor(request) : '';
+  });
   readonly editingId = signal<string | null>(null);
   readonly pendingImages = signal<ProductImage[]>([]);
   readonly uploadingImages = signal(false);
@@ -94,7 +105,12 @@ export class App implements OnInit, OnDestroy {
   );
   readonly isCloudinaryLive = this.cloudinary.configured;
   readonly stockOf = totalStock;
-  readonly priceLabel = productPriceLabel;
+  readonly whatsappContactUrl = computed(() =>
+    this.storeSettings.whatsappUrl('Hello BP Fashion Park'),
+  );
+  readonly contactEmailUrl = computed(
+    () => `mailto:${this.storeSettings.settings().contactEmail}`,
+  );
   readonly heroSlide = signal(0);
   readonly heroSlides = [
     {
@@ -229,7 +245,13 @@ export class App implements OnInit, OnDestroy {
     await Promise.all([
       this.store.initialize(),
       this.categoryStore.initialize(),
+      this.storeSettings.initialize(),
     ]);
+    if (
+      typeof window !== 'undefined' &&
+      !window.localStorage.getItem('bp-fashion-language')
+    )
+      this.language.set(this.storeSettings.settings().defaultLanguage);
     if (typeof window !== 'undefined') this.startHeroCarousel();
   }
 
@@ -288,6 +310,47 @@ export class App implements OnInit, OnDestroy {
     this.closeMobileMenu();
     this.closeSearch();
     this.cart.open.set(true);
+  }
+  async submitCustomerRequest(event: Event): Promise<void> {
+    event.preventDefault();
+    const form = event.target as HTMLFormElement;
+    if (!form.reportValidity() || this.requestSubmitting()) return;
+    const data = new FormData(form);
+    const items = this.cart.items().map((item) => ({
+      productId: item.productId,
+      name: item.name,
+      color: item.color,
+      size: item.size,
+      quantity: item.quantity,
+      priceLabel: item.priceLabel,
+    }));
+    this.requestSubmitting.set(true);
+    this.requestError.set('');
+    try {
+      this.submittedRequest.set(
+        await this.customerRequests.create(
+          String(data.get('name') || ''),
+          String(data.get('phone') || ''),
+          String(data.get('city') || ''),
+          String(data.get('message') || ''),
+          items,
+        ),
+      );
+    } catch (error) {
+      this.requestError.set(
+        error instanceof Error
+          ? error.message
+          : 'The request could not be saved.',
+      );
+    } finally {
+      this.requestSubmitting.set(false);
+    }
+  }
+  finishCustomerRequest(): void {
+    this.cart.clear();
+    this.cart.open.set(false);
+    this.submittedRequest.set(null);
+    this.requestError.set('');
   }
   closeSearch(): void {
     this.searchOpen.set(false);
@@ -361,6 +424,14 @@ export class App implements OnInit, OnDestroy {
   }
   categoryName(id: string): string {
     return this.categoryStore.name(id);
+  }
+  priceLabel(product: Product): string {
+    return this.storeSettings.priceLabel(product);
+  }
+  originalPriceLabel(product: Product): string {
+    return product.originalPrice
+      ? this.storeSettings.formatMoney(product.originalPrice)
+      : '';
   }
   openProduct(id: string): void {
     const product = this.store.find(id);

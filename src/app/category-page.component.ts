@@ -13,8 +13,9 @@ import { filter } from 'rxjs';
 import { Category } from './category.model';
 import { CategoryStore } from './category-store.service';
 import { ProductStore } from './product-store.service';
-import { productPriceLabel, totalStock } from './product.model';
+import { Product, totalStock } from './product.model';
 import { SeoService } from './seo.service';
+import { StoreSettingsService } from './store-settings.service';
 
 @Component({
   selector: 'app-category-page',
@@ -31,6 +32,7 @@ export class CategoryPageComponent implements OnInit {
   private readonly seo = inject(SeoService);
   readonly categoryStore = inject(CategoryStore);
   readonly productStore = inject(ProductStore);
+  readonly storeSettings = inject(StoreSettingsService);
   readonly category = signal<Category | undefined>(undefined);
   readonly resolved = signal(false);
   readonly catalogLoading = computed(
@@ -57,7 +59,14 @@ export class CategoryPageComponent implements OnInit {
       .filter((product) => ids.has(product.category));
   });
   readonly stockOf = totalStock;
-  readonly priceLabel = productPriceLabel;
+  priceLabel(product: Product): string {
+    return this.storeSettings.priceLabel(product);
+  }
+  originalPriceLabel(product: Product): string {
+    return product.originalPrice
+      ? this.storeSettings.formatMoney(product.originalPrice)
+      : '';
+  }
 
   constructor() {
     this.router.events
@@ -83,6 +92,7 @@ export class CategoryPageComponent implements OnInit {
     await Promise.all([
       this.categoryStore.initialize(),
       this.productStore.initialize(),
+      this.storeSettings.initialize(),
     ]);
     this.resolveCategory();
   }

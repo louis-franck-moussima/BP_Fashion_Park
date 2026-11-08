@@ -17,6 +17,21 @@ The Firebase web configuration identifies the public web application. It is not 
 6. Never add a Firebase service-account JSON file, Cloudinary API secret, administrator password, or private API token to this repository or an Angular environment file.
 7. Enable Firebase and Google Cloud budget alerts. App Check and budget alerts reduce abuse but do not act as hard spending caps.
 
+## Secure Cloudinary deletion
+
+Existing Cloudinary assets require an authenticated server-side destroy request. The Angular application calls the authenticated Firebase callable function in `functions/src/index.ts`; the Cloudinary API secret must never be placed in an Angular environment file.
+
+Set the three function secrets and deploy the function:
+
+```sh
+firebase functions:secrets:set CLOUDINARY_CLOUD_NAME
+firebase functions:secrets:set CLOUDINARY_API_KEY
+firebase functions:secrets:set CLOUDINARY_API_SECRET
+firebase deploy --only functions:deleteCloudinaryImage
+```
+
+The function requires Firebase Authentication and App Check, only accepts product-folder public IDs, and invalidates cached Cloudinary copies after deletion.
+
 ## Deployment
 
 This project uses Angular SSR, so deploy the web application with **Firebase App Hosting**, not classic static Firebase Hosting. The checked-in `apphosting.yaml` keeps zero idle instances and limits automatic scaling to three instances for this small catalog. This is a cost-control measure, not a hard spending cap.

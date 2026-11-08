@@ -14,6 +14,10 @@ export function validateProduct(
   const errors: string[] = [];
   if (product.name.length < 2 || product.name.length > 100)
     errors.push('Product name must contain 2–100 characters.');
+  if (!product.sku || !/^[A-Za-z0-9][A-Za-z0-9._-]{1,39}$/.test(product.sku))
+    errors.push(
+      'SKU must contain 2–40 letters, numbers, dots, dashes or underscores.',
+    );
   if (
     !product.category ||
     (validCategoryIds && !validCategoryIds.has(product.category))
@@ -30,11 +34,26 @@ export function validateProduct(
   if (product.priceMode !== 'on-request' && product.price <= 0)
     errors.push('Fixed and starting prices must be greater than €0.');
   if (
+    product.originalPrice !== undefined &&
+    (!Number.isFinite(product.originalPrice) ||
+      product.originalPrice <= product.price ||
+      product.originalPrice > 1_000_000)
+  )
+    errors.push('Original price must be higher than the current price.');
+  if (
     !Number.isInteger(product.stock) ||
     (product.stock ?? 0) < 0 ||
     (product.stock ?? 0) > 100_000
   )
     errors.push('Stock must be a whole number between 0 and 100,000.');
+  if (
+    !Number.isInteger(product.lowStockThreshold) ||
+    (product.lowStockThreshold ?? 0) < 0 ||
+    (product.lowStockThreshold ?? 0) > 100_000
+  )
+    errors.push(
+      'Low-stock threshold must be a whole number between 0 and 100,000.',
+    );
   if (product.description.length < 10 || product.description.length > 1_000)
     errors.push('Description must contain 10–1,000 characters.');
   if (!product.images.length) errors.push('Add at least one product image.');
@@ -72,6 +91,14 @@ export function validateProduct(
   }
   if ((product.ageRange ?? '').length > 80)
     errors.push('Age range must not exceed 80 characters.');
+  const related = product.relatedProductIds ?? [];
+  if (related.length > 8 || !unique(related) || related.includes(product.id))
+    errors.push(
+      'Choose no more than 8 unique related products and do not select the product itself.',
+    );
+  const wigValues = product.wigDetails ? Object.values(product.wigDetails) : [];
+  if (wigValues.some((value) => value && value.length > 80))
+    errors.push('Each wig detail must not exceed 80 characters.');
   return [...new Set(errors)];
 }
 
@@ -95,6 +122,23 @@ export function validateCategory(
     errors.push('Choose an existing parent category.');
   if (category.parentCategoryId === category.id)
     errors.push('A category cannot be its own parent.');
+  if (category.parentCategoryId) {
+    const byId = new Map(categories.map((item) => [item.id, item]));
+    const visited = new Set<string>();
+    let current = byId.get(category.parentCategoryId);
+    while (current && !visited.has(current.id)) {
+      if (current.id === category.id) {
+        errors.push(
+          'A category cannot be moved inside one of its subcategories.',
+        );
+        break;
+      }
+      visited.add(current.id);
+      current = current.parentCategoryId
+        ? byId.get(current.parentCategoryId)
+        : undefined;
+    }
+  }
   const duplicate = categories.some(
     (item) =>
       item.id !== category.id &&

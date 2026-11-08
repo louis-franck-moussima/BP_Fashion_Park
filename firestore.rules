@@ -32,22 +32,25 @@ service cloud.firestore {
     function validProduct(productId) {
       let data = request.resource.data;
       return request.resource.data.keys().hasAll([
-          'id', 'name', 'category', 'price', 'art', 'description', 'images', 'colors', 'createdAt'
+          'id', 'name', 'sku', 'category', 'price', 'art', 'description', 'images', 'colors', 'createdAt'
         ])
         && request.resource.data.keys().hasOnly([
-          'id', 'name', 'category', 'price', 'priceMode', 'negotiable', 'stock', 'art',
+          'id', 'name', 'sku', 'category', 'price', 'originalPrice', 'priceMode', 'negotiable', 'stock', 'lowStockThreshold', 'art',
           'description', 'images', 'colors', 'sizes', 'audiences', 'ageRange', 'tags',
-          'featured', 'createdAt'
+          'featured', 'newArrival', 'limitedQuantity', 'relatedProductIds', 'wigDetails', 'createdAt'
         ])
         && data.id is string && data.id == productId && data.id.size() <= 160
         && data.name is string && data.name.size() >= 2 && data.name.size() <= 100
+        && data.sku is string && data.sku.matches('[A-Za-z0-9][A-Za-z0-9._-]{1,39}')
         && data.category is string
         && existsAfter(/databases/$(database)/documents/categories/$(data.category))
         && data.price is number && data.price >= 0 && data.price <= 1000000
+        && (!('originalPrice' in data) || (data.originalPrice is number && data.originalPrice > data.price && data.originalPrice <= 1000000))
         && (!('priceMode' in data) || data.priceMode in ['fixed', 'from', 'on-request'])
         && (!('priceMode' in data) || data.priceMode == 'on-request' || data.price > 0)
         && (!('negotiable' in data) || data.negotiable is bool)
         && (!('stock' in data) || (data.stock is int && data.stock >= 0 && data.stock <= 100000))
+        && (!('lowStockThreshold' in data) || (data.lowStockThreshold is int && data.lowStockThreshold >= 0 && data.lowStockThreshold <= 100000))
         && data.art is string && data.art in ['dress', 'shoe', 'bag', 'tote', 'necklace', 'case']
         && data.description is string && data.description.size() >= 10 && data.description.size() <= 1000
         && data.images is list && data.images.size() >= 1 && data.images.size() <= 8
@@ -57,7 +60,47 @@ service cloud.firestore {
         && (!('ageRange' in data) || (data.ageRange is string && data.ageRange.size() <= 80))
         && (!('tags' in data) || (data.tags is list && data.tags.size() <= 30))
         && (!('featured' in data) || data.featured is bool)
+        && (!('newArrival' in data) || data.newArrival is bool)
+        && (!('limitedQuantity' in data) || data.limitedQuantity is bool)
+        && (!('relatedProductIds' in data) || (data.relatedProductIds is list && data.relatedProductIds.size() <= 8))
+        && (!('wigDetails' in data) || (data.wigDetails is map
+          && data.wigDetails.keys().hasOnly(['length', 'texture', 'laceType', 'density'])
+          && (!('length' in data.wigDetails) || (data.wigDetails.length is string && data.wigDetails.length.size() <= 80))
+          && (!('texture' in data.wigDetails) || (data.wigDetails.texture is string && data.wigDetails.texture.size() <= 80))
+          && (!('laceType' in data.wigDetails) || (data.wigDetails.laceType is string && data.wigDetails.laceType.size() <= 80))
+          && (!('density' in data.wigDetails) || (data.wigDetails.density is string && data.wigDetails.density.size() <= 80))))
         && data.createdAt is number && data.createdAt > 0;
+    }
+
+    function validCustomerRequest(requestId) {
+      let data = request.resource.data;
+      return data.keys().hasAll(['id', 'reference', 'name', 'phone', 'city', 'message', 'items', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'reference', 'name', 'phone', 'city', 'message', 'items', 'status', 'createdAt', 'updatedAt'])
+        && data.id == requestId
+        && data.reference is string && data.reference.matches('BP-[0-9]{4}-[A-Za-z0-9]{6}')
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 80
+        && data.phone is string && data.phone.size() >= 5 && data.phone.size() <= 30
+        && data.city is string && data.city.size() >= 2 && data.city.size() <= 80
+        && data.message is string && data.message.size() <= 500
+        && data.items is list && data.items.size() >= 1 && data.items.size() <= 30
+        && data.status in ['new', 'contacted', 'confirmed', 'closed']
+        && data.createdAt is number && data.createdAt > 0
+        && data.updatedAt is number && data.updatedAt >= data.createdAt;
+    }
+
+    function validStoreSettings() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['whatsappNumber', 'instagramUrl', 'contactEmail', 'businessAddress', 'deliveryInformation', 'currency', 'defaultLanguage', 'announcementText', 'updatedAt'])
+        && data.keys().hasOnly(['whatsappNumber', 'instagramUrl', 'contactEmail', 'businessAddress', 'deliveryInformation', 'currency', 'defaultLanguage', 'announcementText', 'updatedAt'])
+        && data.whatsappNumber is string && data.whatsappNumber.size() <= 20
+        && data.instagramUrl is string && data.instagramUrl.size() <= 300
+        && data.contactEmail is string && data.contactEmail.size() >= 3 && data.contactEmail.size() <= 120
+        && data.businessAddress is string && data.businessAddress.size() <= 300
+        && data.deliveryInformation is string && data.deliveryInformation.size() <= 600
+        && data.currency in ['EUR', 'USD', 'GBP', 'XOF', 'CDF']
+        && data.defaultLanguage in ['en', 'fr']
+        && data.announcementText is string && data.announcementText.size() >= 1 && data.announcementText.size() <= 140
+        && data.updatedAt is number && data.updatedAt > 0;
     }
 
     match /products/{productId} {
@@ -66,10 +109,45 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /products/{productId}/stockHistory/{movementId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasAll(['id', 'productId', 'delta', 'previousStock', 'newStock', 'reason', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['id', 'productId', 'delta', 'previousStock', 'newStock', 'reason', 'createdAt'])
+        && request.resource.data.id == movementId
+        && request.resource.data.productId == productId
+        && request.resource.data.delta is int && request.resource.data.delta != 0
+        && request.resource.data.previousStock is int && request.resource.data.previousStock >= 0
+        && request.resource.data.newStock is int && request.resource.data.newStock >= 0
+        && request.resource.data.newStock == request.resource.data.previousStock + request.resource.data.delta
+        && request.resource.data.reason in ['increase', 'decrease', 'restock']
+        && (request.resource.data.reason == 'decrease' ? request.resource.data.delta < 0 : request.resource.data.delta > 0)
+        && getAfter(/databases/$(database)/documents/products/$(productId)).data.stock == request.resource.data.newStock
+        && request.resource.data.createdAt is number;
+      allow update, delete: if false;
+    }
+
     match /categories/{categoryId} {
       allow read: if true;
       allow create, update: if isAdmin() && validCategory(categoryId);
       allow delete: if isAdmin();
+    }
+
+    match /customerRequests/{requestId} {
+      allow create: if validCustomerRequest(requestId)
+        && request.resource.data.status == 'new'
+        && request.resource.data.createdAt == request.resource.data.updatedAt;
+      allow read: if isAdmin();
+      allow update: if isAdmin()
+        && validCustomerRequest(requestId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    match /settings/store {
+      allow read: if true;
+      allow create, update: if isAdmin() && validStoreSettings();
+      allow delete: if false;
     }
 
     match /{document=**} {

@@ -1,169 +1,1081 @@
 @if (!isAuthPage()) {
-<div class="announcement">Complimentary delivery on orders over €100 <span>•</span> New arrivals every week</div>
-<header class="site-header">
-  <button class="menu-button" (click)="toggleMobileMenu()" aria-label="Open categories" [attr.aria-expanded]="menuOpen()"><span></span><span></span></button>
-  <a class="brand" href="/" aria-label="BP Fashion Park home"><span class="brand-mark">BP</span><span class="brand-name">FASHION PARK</span></a>
-  <nav class="main-navigation desktop-navigation" [class.mega-dismissed]="megaMenuDismissed()" (mouseleave)="reopenMegaMenu()" aria-label="Main navigation">
-    <button class="nav-main" (click)="selectCategory('All'); openHome('new')">New in</button>
-    @for (category of rootCategories(); track category.id) {
-      <div class="nav-group" (mouseenter)="reopenMegaMenu()" (focusin)="reopenMegaMenu()">
-        <button class="nav-main" [class.active]="activeCategory() === category.id" (click)="openCategoryPage(category.id)">{{ category.name }}</button>
-        @if (categoryStore.children(category.id).length) {
-          <div class="nav-submenu" [attr.aria-label]="category.name + ' categories'">
-            <div class="mega-columns">
-              <section class="mega-column mega-overview">
-                <span>Explore</span>
-                <button class="mega-view-all" (click)="openCategoryPage(category.id)">View all {{ category.name }}</button>
-              </section>
-              @for (child of categoryStore.children(category.id); track child.id) {
-                <section class="mega-column">
-                  <button class="nav-child" [class.active]="activeCategory() === child.id" (click)="openCategoryPage(child.id)">{{ child.name }}</button>
-                  @if (categoryStore.children(child.id).length) { <div class="nav-subchildren">@for (grandchild of categoryStore.children(child.id); track grandchild.id) { <button (click)="openCategoryPage(grandchild.id)">{{ grandchild.name }}</button> }</div> }
+  <div class="announcement">
+    {{ storeSettings.settings().announcementText }}
+  </div>
+  <header class="site-header">
+    <button
+      class="menu-button"
+      (click)="toggleMobileMenu()"
+      aria-label="Open categories"
+      [attr.aria-expanded]="menuOpen()"
+    >
+      <span></span><span></span>
+    </button>
+    <a class="brand" href="/" aria-label="BP Fashion Park home"
+      ><span class="brand-mark">BP</span
+      ><span class="brand-name">FASHION PARK</span></a
+    >
+    <nav
+      class="main-navigation desktop-navigation"
+      [class.mega-dismissed]="megaMenuDismissed()"
+      (mouseleave)="reopenMegaMenu()"
+      aria-label="Main navigation"
+    >
+      <button class="nav-main" (click)="selectCategory('All'); openHome('new')">
+        New in
+      </button>
+      @for (category of rootCategories(); track category.id) {
+        <div
+          class="nav-group"
+          (mouseenter)="reopenMegaMenu()"
+          (focusin)="reopenMegaMenu()"
+        >
+          <button
+            class="nav-main"
+            [class.active]="activeCategory() === category.id"
+            (click)="openCategoryPage(category.id)"
+          >
+            {{ category.name }}
+          </button>
+          @if (categoryStore.children(category.id).length) {
+            <div
+              class="nav-submenu"
+              [attr.aria-label]="category.name + ' categories'"
+            >
+              <div class="mega-columns">
+                <section class="mega-column mega-overview">
+                  <span>Explore</span>
+                  <button
+                    class="mega-view-all"
+                    (click)="openCategoryPage(category.id)"
+                  >
+                    View all {{ category.name }}
+                  </button>
                 </section>
-              }
+                @for (
+                  child of categoryStore.children(category.id);
+                  track child.id
+                ) {
+                  <section class="mega-column">
+                    <button
+                      class="nav-child"
+                      [class.active]="activeCategory() === child.id"
+                      (click)="openCategoryPage(child.id)"
+                    >
+                      {{ child.name }}
+                    </button>
+                    @if (categoryStore.children(child.id).length) {
+                      <div class="nav-subchildren">
+                        @for (
+                          grandchild of categoryStore.children(child.id);
+                          track grandchild.id
+                        ) {
+                          <button (click)="openCategoryPage(grandchild.id)">
+                            {{ grandchild.name }}
+                          </button>
+                        }
+                      </div>
+                    }
+                  </section>
+                }
+              </div>
             </div>
+          }
+        </div>
+      }
+    </nav>
+    @if (menuOpen()) {
+      <aside class="mobile-navigation" aria-label="Mobile categories">
+        <div class="mobile-menu-head">
+          <div>
+            <small>BP Fashion Park</small
+            ><strong>{{
+              mobileMenuCurrentCategory()?.name || "Categories"
+            }}</strong>
+          </div>
+          <button
+            class="mobile-menu-close"
+            (click)="closeMobileMenu()"
+            aria-label="Close categories"
+          >
+            ×
+          </button>
+        </div>
+        <div class="mobile-menu-body">
+          @if (mobileMenuCurrentCategory(); as current) {
+            <button class="mobile-menu-back" (click)="mobileMenuBack()">
+              Back
+            </button>
+            <button
+              class="mobile-menu-view-all"
+              (click)="openCategoryPage(current.id)"
+            >
+              View all {{ current.name }}
+            </button>
+          }
+          <div class="mobile-menu-list">
+            @for (category of mobileMenuCategories(); track category.id) {
+              <button (click)="openMobileMenuCategory(category)">
+                <span>{{ category.name }}</span>
+                @if (categoryStore.children(category.id).length) {
+                  <small>Browse</small>
+                }
+              </button>
+            }
+          </div>
+        </div>
+      </aside>
+    }
+    <div class="header-actions">
+      <button
+        aria-label="Search products"
+        [attr.aria-expanded]="searchOpen()"
+        (click)="openSearch()"
+      >
+        <svg viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="6.5" />
+          <path d="m16 16 4 4" />
+        </svg></button
+      ><button
+        class="bag-button"
+        aria-label="Open request bag"
+        [attr.aria-expanded]="cart.open()"
+        (click)="openCart()"
+      >
+        <svg viewBox="0 0 24 24">
+          <path d="M5 8h14l-1 12H6L5 8Z" />
+          <path d="M9 9V6a3 3 0 0 1 6 0v3" /></svg
+        ><span>{{ cart.count() }}</span>
+      </button>
+    </div>
+  </header>
+  @if (searchOpen()) {
+    <div class="search-backdrop" (click)="closeSearch()"></div>
+    <section
+      class="global-search"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Search BP Fashion Park"
+      (keydown.escape)="closeSearch()"
+    >
+      <div class="global-search-head">
+        <div>
+          <span class="section-label">Find your next piece</span
+          ><label
+            ><svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="m16 16 4 4" /></svg
+            ><input
+              class="global-search-input"
+              type="search"
+              placeholder="Search products, categories or colors"
+              [value]="searchQuery()"
+              (input)="searchQuery.set($any($event.target).value)"
+              autocomplete="off"
+          /></label>
+        </div>
+        <button
+          class="search-close"
+          (click)="closeSearch()"
+          aria-label="Close search"
+        >
+          ×
+        </button>
+      </div>
+      <div class="search-summary">
+        <span>{{
+          searchQuery().trim()
+            ? searchSuggestions().length + " matching suggestions"
+            : "Popular right now"
+        }}</span>
+        @if (searchQuery().trim()) {
+          <button (click)="searchQuery.set('')">Clear search</button>
+        }
+      </div>
+      <div class="search-results">
+        @for (product of searchSuggestions(); track product.id) {
+          <button class="search-result" (click)="openSearchProduct(product.id)">
+            <span class="search-result-image">
+              @if (product.images.length) {
+                <img
+                  [src]="product.images[0].url"
+                  [alt]="product.images[0].alt || product.name"
+                />
+              } @else {
+                <b>{{ product.name.charAt(0) }}</b>
+              }</span
+            ><span class="search-result-copy"
+              ><small>{{ categoryName(product.category) }}</small
+              ><strong>{{ product.name }}</strong
+              ><em [class.out]="stockOf(product) === 0">{{
+                stockOf(product) === 0
+                  ? "Out of stock"
+                  : stockOf(product) + " available"
+              }}</em></span
+            ><span class="search-result-price">{{ priceLabel(product) }}</span>
+          </button>
+        } @empty {
+          <div class="search-empty">
+            <strong>No matching pieces</strong>
+            <p>
+              Try a product name, category or color such as “dress”, “shoes” or
+              “black”.
+            </p>
           </div>
         }
       </div>
-    }
-  </nav>
-  @if (menuOpen()) {
-    <aside class="mobile-navigation" aria-label="Mobile categories">
-      <div class="mobile-menu-head">
-        <div><small>BP Fashion Park</small><strong>{{ mobileMenuCurrentCategory()?.name || 'Categories' }}</strong></div>
-        <button class="mobile-menu-close" (click)="closeMobileMenu()" aria-label="Close categories">×</button>
-      </div>
-      <div class="mobile-menu-body">
-        @if (mobileMenuCurrentCategory(); as current) {
-          <button class="mobile-menu-back" (click)="mobileMenuBack()">Back</button>
-          <button class="mobile-menu-view-all" (click)="openCategoryPage(current.id)">View all {{ current.name }}</button>
+      @if (searchQuery().trim() && searchSuggestions().length) {
+        <button class="search-view-all" (click)="viewAllSearchResults()">
+          View all catalog results
+        </button>
+      }
+    </section>
+  }
+  @if (cart.open()) {
+    <div class="cart-backdrop" (click)="cart.open.set(false)"></div>
+    <aside
+      class="cart-drawer"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Your request bag"
+      (keydown.escape)="cart.open.set(false)"
+    >
+      <header>
+        <div>
+          <small>Your selection</small>
+          <h2>Request bag</h2>
+        </div>
+        <button (click)="cart.open.set(false)" aria-label="Close request bag">
+          ×
+        </button>
+      </header>
+      <p class="cart-intro">
+        No online payment is required. Send your selection to confirm
+        availability, the final price and delivery.
+      </p>
+      <div class="cart-items">
+        @for (item of cart.items(); track item.key) {
+          <article>
+            @if (item.imageUrl) {
+              <img [src]="item.imageUrl" [alt]="item.name" />
+            } @else {
+              <span class="cart-fallback">BP</span>
+            }
+            <div>
+              <strong>{{ item.name }}</strong
+              ><small
+                >{{ item.color }}
+                @if (item.size) {
+                  · {{ item.size }}
+                }</small
+              ><b>{{ item.priceLabel }}</b>
+              <div class="cart-quantity">
+                <button
+                  (click)="cart.changeQuantity(item.key, -1)"
+                  aria-label="Reduce quantity"
+                >
+                  −</button
+                ><span>{{ item.quantity }}</span
+                ><button
+                  (click)="cart.changeQuantity(item.key, 1)"
+                  aria-label="Increase quantity"
+                >
+                  +</button
+                ><button class="cart-remove" (click)="cart.remove(item.key)">
+                  Remove
+                </button>
+              </div>
+            </div>
+          </article>
+        } @empty {
+          <div class="cart-empty">
+            <span>◇</span><strong>Your request bag is empty</strong>
+            <p>Add products from their detail pages.</p>
+          </div>
         }
-        <div class="mobile-menu-list">
-          @for (category of mobileMenuCategories(); track category.id) {
-            <button (click)="openMobileMenuCategory(category)"><span>{{ category.name }}</span>@if (categoryStore.children(category.id).length) { <small>Browse</small> }</button>
+      </div>
+      @if (cart.items().length && !submittedRequest()) {
+        <form
+          class="request-contact-form"
+          (submit)="submitCustomerRequest($event)"
+        >
+          <div>
+            <label
+              >Name<input
+                name="name"
+                required
+                minlength="2"
+                maxlength="80"
+                autocomplete="name" /></label
+            ><label
+              >Phone<input
+                name="phone"
+                type="tel"
+                required
+                minlength="5"
+                maxlength="30"
+                autocomplete="tel"
+            /></label>
+          </div>
+          <label
+            >City<input
+              name="city"
+              required
+              minlength="2"
+              maxlength="80"
+              autocomplete="address-level2"
+          /></label>
+          <label
+            >Message <small>Optional</small
+            ><textarea
+              name="message"
+              rows="3"
+              maxlength="500"
+              placeholder="Delivery details or a question for the owner"
+            ></textarea>
+          </label>
+          @if (requestError()) {
+            <p class="request-error" role="alert">{{ requestError() }}</p>
+          }
+          <small
+            >This sends an availability request. It is not a payment or
+            confirmed order.</small
+          >
+          <button type="submit" [disabled]="requestSubmitting()">
+            {{
+              requestSubmitting()
+                ? "Preparing request…"
+                : "Prepare WhatsApp request"
+            }}
+          </button>
+        </form>
+      }
+      @if (submittedRequest(); as request) {
+        <section class="request-success">
+          <span>✓</span><small>Request saved</small
+          ><strong>{{ request.reference }}</strong>
+          <p>Keep this reference when speaking with BP Fashion Park.</p>
+          <a
+            [href]="requestWhatsappUrl()"
+            target="_blank"
+            rel="noopener"
+            (click)="finishCustomerRequest()"
+            >Continue to WhatsApp</a
+          >
+        </section>
+      }
+    </aside>
+  }
+}
+@if (!isDetailPage()) {
+  <main>
+    <section
+      class="hero"
+      id="new"
+      aria-roledescription="carousel"
+      aria-label="Featured collections"
+      (mouseenter)="pauseHeroCarousel()"
+      (mouseleave)="resumeHeroCarousel()"
+      (focusin)="pauseHeroCarousel()"
+      (focusout)="resumeHeroCarousel()"
+    >
+      @for (slide of heroSlides; track slide.image; let i = $index) {
+        <div
+          class="hero-slide"
+          [class.active]="heroSlide() === i"
+          [style.background-image]="'url(' + slide.image + ')'"
+          [style.background-position]="slide.position"
+          [attr.aria-hidden]="heroSlide() !== i"
+        ></div>
+      }
+      <div class="hero-copy" aria-live="polite">
+        <p class="eyebrow">{{ heroSlides[heroSlide()].eyebrow }}</p>
+        <h1>
+          {{ heroSlides[heroSlide()].title }}<br /><em>{{
+            heroSlides[heroSlide()].accent
+          }}</em>
+        </h1>
+        <p class="hero-intro">{{ heroSlides[heroSlide()].intro }}</p>
+        <button class="primary" (click)="shopHeroSlide()">
+          Explore the collection
+        </button>
+      </div>
+      <p class="hero-note">One destination.<br />Every expression.</p>
+      <div class="hero-controls">
+        <button
+          class="hero-arrow"
+          (click)="changeHeroSlide(-1)"
+          aria-label="Previous collection"
+        >
+          ←
+        </button>
+        <div class="hero-dots" role="tablist" aria-label="Choose a collection">
+          @for (slide of heroSlides; track slide.image; let i = $index) {
+            <button
+              role="tab"
+              [class.active]="heroSlide() === i"
+              [attr.aria-selected]="heroSlide() === i"
+              (click)="showHeroSlide(i)"
+              [attr.aria-label]="'Show slide ' + (i + 1)"
+            >
+              <span></span>
+            </button>
           }
         </div>
+        <span class="hero-count"
+          >0{{ heroSlide() + 1 }} / 0{{ heroSlides.length }}</span
+        ><button
+          class="hero-arrow"
+          (click)="changeHeroSlide(1)"
+          aria-label="Next collection"
+        >
+          →
+        </button>
+      </div>
+    </section>
+    <section class="manifesto">
+      <p class="section-label">Our point of view</p>
+      <h2>Everyday pieces.<br /><em>Uncommon confidence.</em></h2>
+      <p>
+        BP Fashion Park brings together the pieces that complete your look —
+        from an effortless outfit to the bag, necklace or shoe that makes it
+        entirely yours.
+      </p>
+    </section>
+    <section class="category-showcase" aria-label="Shop by category">
+      @for (
+        category of rootCategories().slice(0, 3);
+        track category.id;
+        let i = $index
+      ) {
+        <article
+          class="category-card"
+          [class.women]="i === 0"
+          [class.men]="i === 1"
+          [class.accessories]="i === 2"
+          (click)="openCategoryPage(category.id)"
+          (keydown.enter)="openCategoryPage(category.id)"
+          tabindex="0"
+        >
+          <div class="category-visual">
+            @if (category.imageUrl) {
+              <img [src]="category.imageUrl" [alt]="category.name" />
+            } @else {
+              <div
+                class="silhouette"
+                [class.dress-shape]="i === 0"
+                [class.jacket-shape]="i === 1"
+                [class.bag-shape]="i === 2"
+              ></div>
+            }
+          </div>
+          <div>
+            <span>0{{ i + 1 }}</span>
+            <h3>{{ category.name }}</h3>
+            <p>{{ category.description }}</p>
+          </div>
+        </article>
+      }
+    </section>
+    <section class="shop" id="shop">
+      <div class="section-heading">
+        <div>
+          <p class="section-label">Curated for you</p>
+          <h2>Shop the <em>edit</em></h2>
+        </div>
+        <p>
+          Discover versatile favorites designed for days in the city, nights out
+          and adventures further away.
+        </p>
+      </div>
+      @if (catalogLoading()) {
+        <div class="catalog-status" role="status">
+          <span></span>
+          <div>
+            <strong>Loading the collection</strong>
+            <p>We’re bringing in the latest products and availability.</p>
+          </div>
+        </div>
+      }
+      @if (catalogError()) {
+        <div class="catalog-status catalog-status-error" role="alert">
+          <span>!</span>
+          <div>
+            <strong>The live catalog is temporarily unavailable</strong>
+            <p>
+              Please refresh the page in a moment. No reference products are
+              being shown as live stock.
+            </p>
+          </div>
+        </div>
+      }
+      @if (!catalogLoading() && !catalogError()) {
+        <div class="catalog-tools">
+          <label class="search-box"
+            ><svg viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="m16 16 4 4" /></svg
+            ><input
+              type="search"
+              placeholder="Search products, colors..."
+              [value]="searchQuery()"
+              (input)="searchQuery.set($any($event.target).value)"
+          /></label>
+          <label class="stock-toggle"
+            ><input
+              type="checkbox"
+              [checked]="inStockOnly()"
+              (change)="inStockOnly.set($any($event.target).checked)"
+            /><span></span> In stock only</label
+          >
+          <label class="sort-select"
+            >Sort by
+            <select
+              [value]="sortBy()"
+              (change)="sortBy.set($any($event.target).value)"
+            >
+              <option value="featured">Featured</option>
+              <option value="newest">Newest</option>
+              <option value="price-low">Price: low to high</option>
+              <option value="price-high">Price: high to low</option>
+            </select></label
+          >
+        </div>
+        <p class="result-count">
+          {{ filteredProducts().length }}
+          {{ filteredProducts().length === 1 ? "product" : "products" }} across
+          the collection
+        </p>
+        <div class="category-product-sections">
+          @for (
+            section of categoryProductSections();
+            track section.category.id
+          ) {
+            <section
+              class="category-product-section"
+              [attr.aria-labelledby]="'latest-' + section.category.id"
+            >
+              <div class="category-product-heading">
+                <div>
+                  <p class="section-label">Latest arrivals</p>
+                  <h3 [id]="'latest-' + section.category.id">
+                    {{ section.category.name }}
+                  </h3>
+                </div>
+                <button
+                  class="category-view-all"
+                  (click)="openCategoryPage(section.category.id)"
+                >
+                  View all
+                </button>
+              </div>
+              <div class="product-grid">
+                @for (product of section.products; track product.id) {
+                  <article class="product-card">
+                    <div
+                      [class]="
+                        'product-art ' +
+                        product.art +
+                        (product.images.length ? ' has-photo' : '')
+                      "
+                      role="link"
+                      tabindex="0"
+                      (click)="openProduct(product.id)"
+                      (keydown.enter)="openProduct(product.id)"
+                    >
+                      <span class="product-badges">
+                        @if (product.newArrival) {
+                          <small>New</small>
+                        }
+                        @if (product.featured) {
+                          <small>Featured</small>
+                        }
+                        @if (product.limitedQuantity) {
+                          <small>Limited quantity</small>
+                        }
+                      </span>
+                      <span
+                        class="availability"
+                        [class.sold-out]="stockOf(product) === 0"
+                        >{{
+                          stockOf(product) === 0
+                            ? "Out of stock"
+                            : stockOf(product) + " available"
+                        }}</span
+                      >
+                      @if (product.images.length) {
+                        <img
+                          [src]="product.images[0].url"
+                          [alt]="product.images[0].alt || product.name"
+                        /><span class="photo-count"
+                          >▧ {{ product.images.length }}</span
+                        >
+                      } @else {
+                        <div class="art-object"></div>
+                      }
+                      <button
+                        aria-label="Save {{ product.name }}"
+                        (click)="$event.stopPropagation()"
+                      >
+                        ♡
+                      </button>
+                    </div>
+                    <div class="product-info">
+                      <div>
+                        <h3>
+                          <button
+                            class="product-link"
+                            (click)="openProduct(product.id)"
+                          >
+                            {{ product.name }}
+                          </button>
+                        </h3>
+                        <p>{{ categoryName(product.category) }}</p>
+                      </div>
+                      <span class="product-prices">
+                        @if (product.originalPrice) {
+                          <del>{{ originalPriceLabel(product) }}</del>
+                        }
+                        <strong>{{ priceLabel(product) }}</strong></span
+                      >
+                    </div>
+                    <p class="product-description">{{ product.description }}</p>
+                    <div class="product-footer">
+                      <div class="swatches" aria-label="Available colors">
+                        @for (color of product.colors; track color.name) {
+                          <span
+                            [style.background]="color.hex"
+                            [title]="color.name"
+                          ></span>
+                        }
+                      </div>
+                      @if (auth.user()) {
+                        <button
+                          class="admin-edit"
+                          (click)="editProduct(product)"
+                        >
+                          Edit product
+                        </button>
+                      }
+                    </div>
+                  </article>
+                }
+              </div>
+            </section>
+          } @empty {
+            <div class="empty">
+              <strong>No products found</strong
+              ><span>Try another search or remove a filter.</span>
+            </div>
+          }
+        </div>
+      }
+    </section>
+    <section class="travel-banner">
+      <div>
+        <p class="eyebrow">Travel beautifully</p>
+        <h2>Pack your<br /><em>possibilities.</em></h2>
+        <p>
+          Suitcases and carry-ons made for weekend escapes, business trips and
+          everything in between.
+        </p>
+        <button class="text-link" (click)="openCategoryPage('travel')">
+          Discover travel
+        </button>
+      </div>
+      <div class="case-art" aria-hidden="true"><span></span><i></i></div>
+    </section>
+    <section class="values">
+      <article>
+        <span>✦</span>
+        <h3>Curated with care</h3>
+        <p>
+          Distinctive pieces selected to help you build a wardrobe that feels
+          personal.
+        </p>
+      </article>
+      <article>
+        <span>◇</span>
+        <h3>For every style</h3>
+        <p>
+          Fashion and accessories for women and men, from everyday to
+          occasion-ready.
+        </p>
+      </article>
+      <article>
+        <span>○</span>
+        <h3>Ready for the journey</h3>
+        <p>
+          From the finishing touch to the perfect suitcase, find it all in one
+          place.
+        </p>
+      </article>
+    </section>
+    <section class="newsletter">
+      <p class="section-label">Stay in style</p>
+      <h2>The latest from<br /><em>BP Fashion Park</em></h2>
+      @if (!subscribed()) {
+        <form (submit)="subscribe($event)">
+          <label class="sr-only" for="email">Email address</label
+          ><input
+            id="email"
+            type="email"
+            required
+            placeholder="Your email address"
+            [value]="email()"
+            (input)="email.set($any($event.target).value)"
+          /><button type="submit">Join the list</button>
+        </form>
+        <small
+          >New arrivals, styling inspiration and special updates. No
+          clutter.</small
+        >
+      } @else {
+        <p class="success">You’re on the list — welcome to the park.</p>
+      }
+    </section>
+  </main>
+  @if (auth.user()) {
+    <div class="admin-actions">
+      <button (click)="openCategoryManager()">Categories</button
+      ><button (click)="newProduct()"><span>＋</span> Add product</button>
+    </div>
+  }
+  @if (adminOpen()) {
+    <div class="admin-backdrop" (click)="adminOpen.set(false)"></div>
+    <aside class="admin-panel" aria-label="Product administration">
+      <div class="admin-heading">
+        <div>
+          <p class="section-label">Admin workspace</p>
+          <h2>{{ editingId() ? "Edit product" : "New product" }}</h2>
+        </div>
+        <button (click)="adminOpen.set(false)" aria-label="Close">×</button>
+      </div>
+      <div class="connection-grid">
+        <div class="data-status" [class.live]="isFirebaseLive">
+          <span></span
+          >{{ isFirebaseLive ? "Firebase connected" : "Firebase demo mode" }}
+        </div>
+        <div class="data-status" [class.live]="isCloudinaryLive">
+          <span></span
+          >{{
+            isCloudinaryLive
+              ? "Cloudinary connected"
+              : "Cloudinary preview mode"
+          }}
+        </div>
+      </div>
+      <form class="admin-form" (submit)="saveProduct($event)">
+        <label
+          >Product name<input
+            name="name"
+            required
+            placeholder="e.g. Riviera Handbag"
+        /></label>
+        <div class="form-row">
+          <label
+            >Category<select name="category">
+              @for (category of categories(); track category.id) {
+                <option [value]="category.id">
+                  {{ category.parentCategoryId ? "↳ " : "" }}{{ category.name }}
+                </option>
+              }
+            </select></label
+          ><label
+            >Price (€)<input
+              name="price"
+              type="number"
+              min="0"
+              step="0.01"
+              required
+          /></label>
+        </div>
+        <label
+          >Display style<select name="art">
+            <option value="bag">Structured bag</option>
+            <option value="tote">Tote bag</option>
+            <option value="necklace">Necklace</option>
+            <option value="dress">Clothing</option>
+            <option value="shoe">Shoe</option>
+            <option value="case">Suitcase</option>
+          </select></label
+        >
+        <label
+          >Description<textarea name="description" rows="3" required></textarea>
+        </label>
+        <div class="media-manager">
+          <div class="media-title">
+            <div>
+              <strong>Product images</strong
+              ><small
+                >Add one or many images. The first one is the storefront
+                cover.</small
+              >
+            </div>
+            <label class="upload-button"
+              >{{ uploadingImages() ? "Uploading…" : "＋ Add images"
+              }}<input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/avif"
+                multiple
+                (change)="selectImages($event)"
+                [disabled]="uploadingImages()"
+            /></label>
+          </div>
+          @if (uploadError()) {
+            <p class="upload-error">{{ uploadError() }}</p>
+          }
+          @if (pendingImages().length) {
+            <div class="image-queue">
+              @for (image of pendingImages(); track image.url; let i = $index) {
+                <div class="image-preview">
+                  <img [src]="image.url" [alt]="image.alt" /><span>{{
+                    i === 0 ? "Cover" : i + 1
+                  }}</span>
+                  <div>
+                    <button
+                      type="button"
+                      (click)="moveImage(i, -1)"
+                      [disabled]="i === 0"
+                      aria-label="Move image left"
+                    >
+                      ←</button
+                    ><button
+                      type="button"
+                      (click)="moveImage(i, 1)"
+                      [disabled]="i === pendingImages().length - 1"
+                      aria-label="Move image right"
+                    >
+                      →</button
+                    ><button
+                      type="button"
+                      (click)="removeImage(i)"
+                      aria-label="Remove image"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="upload-empty">No product images yet</div>
+          }
+        </div>
+        <label
+          >Colors and stock<input
+            name="colors"
+            required
+            placeholder="Black|#222222|5, Red|#a84232|0"
+          /><small
+            >Use: color name | hex color | quantity. Separate colors with
+            commas.</small
+          ></label
+        >
+        <label class="featured-check"
+          ><input name="featured" type="checkbox" /> Feature this product</label
+        >
+        <button
+          class="save-product"
+          type="submit"
+          [disabled]="uploadingImages()"
+        >
+          Save product
+        </button>
+        @if (editingId()) {
+          <button
+            type="button"
+            class="delete-product"
+            (click)="deleteEditingProduct()"
+          >
+            Delete product
+          </button>
+        }
+      </form>
+    </aside>
+  }
+  @if (categoryAdminOpen()) {
+    <div class="admin-backdrop" (click)="categoryAdminOpen.set(false)"></div>
+    <aside
+      class="admin-panel category-panel"
+      aria-label="Category administration"
+    >
+      <div class="admin-heading">
+        <div>
+          <p class="section-label">Catalog structure</p>
+          <h2>Categories</h2>
+        </div>
+        <button (click)="categoryAdminOpen.set(false)" aria-label="Close">
+          ×
+        </button>
+      </div>
+      <form class="category-form" (submit)="addCategory($event)">
+        <label
+          >Name<input
+            name="categoryName"
+            required
+            placeholder="e.g. Training shoes" /></label
+        ><label
+          >Parent category<select name="parentCategoryId">
+            <option value="">None — main category</option>
+            @for (category of categories(); track category.id) {
+              <option [value]="category.id">
+                {{ categoryStore.pathLabel(category.id) }}
+              </option>
+            }
+          </select></label
+        ><label
+          >Description<input
+            name="categoryDescription"
+            placeholder="Short storefront description" /></label
+        ><button type="submit">Add category</button>
+      </form>
+      @if (categoryError()) {
+        <p class="category-error">{{ categoryError() }}</p>
+      }
+      <div class="category-list">
+        @for (category of categoryStore.categories(); track category.id) {
+          <article [class.child]="category.parentCategoryId">
+            <div>
+              <span>{{ category.parentCategoryId ? "↳" : "◇" }}</span>
+              <p>
+                <strong>{{ category.name }}</strong
+                ><small>{{
+                  category.parentCategoryId
+                    ? "Under " + categoryName(category.parentCategoryId)
+                    : "Main category"
+                }}</small>
+              </p>
+            </div>
+            <div class="category-controls">
+              <button (click)="moveCategory(category, -1)" aria-label="Move up">
+                ↑</button
+              ><button
+                (click)="moveCategory(category, 1)"
+                aria-label="Move down"
+              >
+                ↓</button
+              ><button
+                (click)="toggleCategory(category)"
+                [class.active]="category.active"
+              >
+                {{ category.active ? "Visible" : "Hidden" }}</button
+              ><button class="remove" (click)="deleteCategory(category)">
+                ×
+              </button>
+            </div>
+          </article>
+        }
       </div>
     </aside>
   }
-  <div class="header-actions">
-    <button aria-label="Search products" [attr.aria-expanded]="searchOpen()" (click)="openSearch()"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg></button><button class="bag-button" aria-label="Open request bag" [attr.aria-expanded]="cart.open()" (click)="openCart()"><svg viewBox="0 0 24 24"><path d="M5 8h14l-1 12H6L5 8Z"/><path d="M9 9V6a3 3 0 0 1 6 0v3"/></svg><span>{{ cart.count() }}</span></button>
-  </div>
-</header>
-@if (searchOpen()) {
-  <div class="search-backdrop" (click)="closeSearch()"></div>
-  <section class="global-search" role="dialog" aria-modal="true" aria-label="Search BP Fashion Park" (keydown.escape)="closeSearch()">
-    <div class="global-search-head"><div><span class="section-label">Find your next piece</span><label><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input class="global-search-input" type="search" placeholder="Search products, categories or colors" [value]="searchQuery()" (input)="searchQuery.set($any($event.target).value)" autocomplete="off"></label></div><button class="search-close" (click)="closeSearch()" aria-label="Close search">×</button></div>
-    <div class="search-summary"><span>{{ searchQuery().trim() ? searchSuggestions().length + ' matching suggestions' : 'Popular right now' }}</span>@if (searchQuery().trim()) { <button (click)="searchQuery.set('')">Clear search</button> }</div>
-    <div class="search-results">
-      @for (product of searchSuggestions(); track product.id) {
-        <button class="search-result" (click)="openSearchProduct(product.id)"><span class="search-result-image">@if (product.images.length) { <img [src]="product.images[0].url" [alt]="product.images[0].alt || product.name"> } @else { <b>{{ product.name.charAt(0) }}</b> }</span><span class="search-result-copy"><small>{{ categoryName(product.category) }}</small><strong>{{ product.name }}</strong><em [class.out]="stockOf(product) === 0">{{ stockOf(product) === 0 ? 'Out of stock' : stockOf(product) + ' available' }}</em></span><span class="search-result-price">{{ priceLabel(product) }}</span></button>
-      } @empty { <div class="search-empty"><strong>No matching pieces</strong><p>Try a product name, category or color such as “dress”, “shoes” or “black”.</p></div> }
-    </div>
-    @if (searchQuery().trim() && searchSuggestions().length) { <button class="search-view-all" (click)="viewAllSearchResults()">View all catalog results</button> }
-  </section>
-}
-@if (cart.open()) {
-  <div class="cart-backdrop" (click)="cart.open.set(false)"></div>
-  <aside class="cart-drawer" role="dialog" aria-modal="true" aria-label="Your request bag" (keydown.escape)="cart.open.set(false)">
-    <header><div><small>Your selection</small><h2>Request bag</h2></div><button (click)="cart.open.set(false)" aria-label="Close request bag">×</button></header>
-    <p class="cart-intro">No online payment is required. Send your selection to confirm availability, the final price and delivery.</p>
-    <div class="cart-items">
-      @for (item of cart.items(); track item.key) {
-        <article>@if (item.imageUrl) { <img [src]="item.imageUrl" [alt]="item.name"> } @else { <span class="cart-fallback">BP</span> }<div><strong>{{ item.name }}</strong><small>{{ item.color }}@if (item.size) { · {{ item.size }} }</small><b>{{ item.priceLabel }}</b><div class="cart-quantity"><button (click)="cart.changeQuantity(item.key, -1)" aria-label="Reduce quantity">−</button><span>{{ item.quantity }}</span><button (click)="cart.changeQuantity(item.key, 1)" aria-label="Increase quantity">+</button><button class="cart-remove" (click)="cart.remove(item.key)">Remove</button></div></div></article>
-      } @empty { <div class="cart-empty"><span>◇</span><strong>Your request bag is empty</strong><p>Add products from their detail pages.</p></div> }
-    </div>
-    @if (cart.items().length) { <footer><small>This is an availability request, not a confirmed purchase.</small><a [href]="cart.whatsappUrl()" target="_blank" rel="noopener">Send request on WhatsApp</a></footer> }
-  </aside>
-}
-}
-@if (!isDetailPage()) {
-<main>
-  <section class="hero" id="new" aria-roledescription="carousel" aria-label="Featured collections" (mouseenter)="pauseHeroCarousel()" (mouseleave)="resumeHeroCarousel()" (focusin)="pauseHeroCarousel()" (focusout)="resumeHeroCarousel()">
-    @for (slide of heroSlides; track slide.image; let i = $index) { <div class="hero-slide" [class.active]="heroSlide() === i" [style.background-image]="'url(' + slide.image + ')'" [style.background-position]="slide.position" [attr.aria-hidden]="heroSlide() !== i"></div> }
-    <div class="hero-copy" aria-live="polite"><p class="eyebrow">{{ heroSlides[heroSlide()].eyebrow }}</p><h1>{{ heroSlides[heroSlide()].title }}<br><em>{{ heroSlides[heroSlide()].accent }}</em></h1><p class="hero-intro">{{ heroSlides[heroSlide()].intro }}</p><button class="primary" (click)="shopHeroSlide()">Explore the collection</button></div>
-    <p class="hero-note">One destination.<br>Every expression.</p>
-    <div class="hero-controls"><button class="hero-arrow" (click)="changeHeroSlide(-1)" aria-label="Previous collection">←</button><div class="hero-dots" role="tablist" aria-label="Choose a collection">@for (slide of heroSlides; track slide.image; let i = $index) { <button role="tab" [class.active]="heroSlide() === i" [attr.aria-selected]="heroSlide() === i" (click)="showHeroSlide(i)" [attr.aria-label]="'Show slide ' + (i + 1)"><span></span></button> }</div><span class="hero-count">0{{ heroSlide() + 1 }} / 0{{ heroSlides.length }}</span><button class="hero-arrow" (click)="changeHeroSlide(1)" aria-label="Next collection">→</button></div>
-  </section>
-  <section class="manifesto"><p class="section-label">Our point of view</p><h2>Everyday pieces.<br><em>Uncommon confidence.</em></h2><p>BP Fashion Park brings together the pieces that complete your look — from an effortless outfit to the bag, necklace or shoe that makes it entirely yours.</p></section>
-  <section class="category-showcase" aria-label="Shop by category">@for (category of rootCategories().slice(0, 3); track category.id; let i = $index) { <article class="category-card" [class.women]="i === 0" [class.men]="i === 1" [class.accessories]="i === 2" (click)="openCategoryPage(category.id)" (keydown.enter)="openCategoryPage(category.id)" tabindex="0"><div class="category-visual">@if (category.imageUrl) { <img [src]="category.imageUrl" [alt]="category.name"> } @else { <div class="silhouette" [class.dress-shape]="i === 0" [class.jacket-shape]="i === 1" [class.bag-shape]="i === 2"></div> }</div><div><span>0{{ i + 1 }}</span><h3>{{ category.name }}</h3><p>{{ category.description }}</p></div></article> }</section>
-  <section class="shop" id="shop"><div class="section-heading"><div><p class="section-label">Curated for you</p><h2>Shop the <em>edit</em></h2></div><p>Discover versatile favorites designed for days in the city, nights out and adventures further away.</p></div>
-    @if (catalogLoading()) { <div class="catalog-status" role="status"><span></span><div><strong>Loading the collection</strong><p>We’re bringing in the latest products and availability.</p></div></div> }
-    @if (catalogError()) { <div class="catalog-status catalog-status-error" role="alert"><span>!</span><div><strong>The live catalog is temporarily unavailable</strong><p>Please refresh the page in a moment. No reference products are being shown as live stock.</p></div></div> }
-    @if (!catalogLoading() && !catalogError()) {
-    <div class="catalog-tools">
-      <label class="search-box"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input type="search" placeholder="Search products, colors..." [value]="searchQuery()" (input)="searchQuery.set($any($event.target).value)"></label>
-      <label class="stock-toggle"><input type="checkbox" [checked]="inStockOnly()" (change)="inStockOnly.set($any($event.target).checked)"><span></span> In stock only</label>
-      <label class="sort-select">Sort by <select [value]="sortBy()" (change)="sortBy.set($any($event.target).value)"><option value="featured">Featured</option><option value="newest">Newest</option><option value="price-low">Price: low to high</option><option value="price-high">Price: high to low</option></select></label>
-    </div>
-    <p class="result-count">{{ filteredProducts().length }} {{ filteredProducts().length === 1 ? 'product' : 'products' }} across the collection</p>
-    <div class="category-product-sections">
-      @for (section of categoryProductSections(); track section.category.id) {
-        <section class="category-product-section" [attr.aria-labelledby]="'latest-' + section.category.id">
-          <div class="category-product-heading"><div><p class="section-label">Latest arrivals</p><h3 [id]="'latest-' + section.category.id">{{ section.category.name }}</h3></div><button class="category-view-all" (click)="openCategoryPage(section.category.id)">View all</button></div>
-          <div class="product-grid">@for (product of section.products; track product.id) { <article class="product-card"><div [class]="'product-art ' + product.art + (product.images.length ? ' has-photo' : '')" role="link" tabindex="0" (click)="openProduct(product.id)" (keydown.enter)="openProduct(product.id)">@if (product.featured) { <span class="product-tag">Featured</span> }<span class="availability" [class.sold-out]="stockOf(product) === 0">{{ stockOf(product) === 0 ? 'Out of stock' : stockOf(product) + ' available' }}</span>@if (product.images.length) { <img [src]="product.images[0].url" [alt]="product.images[0].alt || product.name"><span class="photo-count">▧ {{ product.images.length }}</span> } @else { <div class="art-object"></div> }<button aria-label="Save {{ product.name }}" (click)="$event.stopPropagation()">♡</button></div><div class="product-info"><div><h3><button class="product-link" (click)="openProduct(product.id)">{{ product.name }}</button></h3><p>{{ categoryName(product.category) }}</p></div><strong>{{ priceLabel(product) }}</strong></div><p class="product-description">{{ product.description }}</p><div class="product-footer"><div class="swatches" aria-label="Available colors">@for (color of product.colors; track color.name) { <span [style.background]="color.hex" [title]="color.name"></span> }</div>@if (auth.user()) { <button class="admin-edit" (click)="editProduct(product)">Edit product</button> }</div></article> }</div>
-        </section>
-      } @empty { <div class="empty"><strong>No products found</strong><span>Try another search or remove a filter.</span></div> }
-    </div>
-    }
-  </section>
-  <section class="travel-banner"><div><p class="eyebrow">Travel beautifully</p><h2>Pack your<br><em>possibilities.</em></h2><p>Suitcases and carry-ons made for weekend escapes, business trips and everything in between.</p><button class="text-link" (click)="openCategoryPage('travel')">Discover travel</button></div><div class="case-art" aria-hidden="true"><span></span><i></i></div></section>
-  <section class="values"><article><span>✦</span><h3>Curated with care</h3><p>Distinctive pieces selected to help you build a wardrobe that feels personal.</p></article><article><span>◇</span><h3>For every style</h3><p>Fashion and accessories for women and men, from everyday to occasion-ready.</p></article><article><span>○</span><h3>Ready for the journey</h3><p>From the finishing touch to the perfect suitcase, find it all in one place.</p></article></section>
-  <section class="newsletter"><p class="section-label">Stay in style</p><h2>The latest from<br><em>BP Fashion Park</em></h2>@if (!subscribed()) { <form (submit)="subscribe($event)"><label class="sr-only" for="email">Email address</label><input id="email" type="email" required placeholder="Your email address" [value]="email()" (input)="email.set($any($event.target).value)"><button type="submit">Join the list</button></form><small>New arrivals, styling inspiration and special updates. No clutter.</small> } @else { <p class="success">You’re on the list — welcome to the park.</p> }</section>
-</main>
-@if (auth.user()) { <div class="admin-actions"><button (click)="openCategoryManager()">Categories</button><button (click)="newProduct()"><span>＋</span> Add product</button></div> }
-@if (adminOpen()) {
-  <div class="admin-backdrop" (click)="adminOpen.set(false)"></div>
-  <aside class="admin-panel" aria-label="Product administration">
-    <div class="admin-heading"><div><p class="section-label">Admin workspace</p><h2>{{ editingId() ? 'Edit product' : 'New product' }}</h2></div><button (click)="adminOpen.set(false)" aria-label="Close">×</button></div>
-    <div class="connection-grid"><div class="data-status" [class.live]="isFirebaseLive"><span></span>{{ isFirebaseLive ? 'Firebase connected' : 'Firebase demo mode' }}</div><div class="data-status" [class.live]="isCloudinaryLive"><span></span>{{ isCloudinaryLive ? 'Cloudinary connected' : 'Cloudinary preview mode' }}</div></div>
-    <form class="admin-form" (submit)="saveProduct($event)">
-      <label>Product name<input name="name" required placeholder="e.g. Riviera Handbag"></label>
-      <div class="form-row"><label>Category<select name="category">@for (category of categories(); track category.id) { <option [value]="category.id">{{ category.parentCategoryId ? '↳ ' : '' }}{{ category.name }}</option> }</select></label><label>Price (€)<input name="price" type="number" min="0" step="0.01" required></label></div>
-      <label>Display style<select name="art"><option value="bag">Structured bag</option><option value="tote">Tote bag</option><option value="necklace">Necklace</option><option value="dress">Clothing</option><option value="shoe">Shoe</option><option value="case">Suitcase</option></select></label>
-      <label>Description<textarea name="description" rows="3" required></textarea></label>
-      <div class="media-manager">
-        <div class="media-title"><div><strong>Product images</strong><small>Add one or many images. The first one is the storefront cover.</small></div><label class="upload-button">{{ uploadingImages() ? 'Uploading…' : '＋ Add images' }}<input type="file" accept="image/png,image/jpeg,image/webp,image/avif" multiple (change)="selectImages($event)" [disabled]="uploadingImages()"></label></div>
-        @if (uploadError()) { <p class="upload-error">{{ uploadError() }}</p> }
-        @if (pendingImages().length) { <div class="image-queue">@for (image of pendingImages(); track image.url; let i = $index) { <div class="image-preview"><img [src]="image.url" [alt]="image.alt"><span>{{ i === 0 ? 'Cover' : i + 1 }}</span><div><button type="button" (click)="moveImage(i, -1)" [disabled]="i === 0" aria-label="Move image left">←</button><button type="button" (click)="moveImage(i, 1)" [disabled]="i === pendingImages().length - 1" aria-label="Move image right">→</button><button type="button" (click)="removeImage(i)" aria-label="Remove image">×</button></div></div> }</div> } @else { <div class="upload-empty">No product images yet</div> }
-      </div>
-      <label>Colors and stock<input name="colors" required placeholder="Black|#222222|5, Red|#a84232|0"><small>Use: color name | hex color | quantity. Separate colors with commas.</small></label>
-      <label class="featured-check"><input name="featured" type="checkbox"> Feature this product</label>
-      <button class="save-product" type="submit" [disabled]="uploadingImages()">Save product</button>
-      @if (editingId()) { <button type="button" class="delete-product" (click)="deleteEditingProduct()">Delete product</button> }
-    </form>
-  </aside>
-}
-@if (categoryAdminOpen()) {
-  <div class="admin-backdrop" (click)="categoryAdminOpen.set(false)"></div>
-  <aside class="admin-panel category-panel" aria-label="Category administration"><div class="admin-heading"><div><p class="section-label">Catalog structure</p><h2>Categories</h2></div><button (click)="categoryAdminOpen.set(false)" aria-label="Close">×</button></div>
-    <form class="category-form" (submit)="addCategory($event)"><label>Name<input name="categoryName" required placeholder="e.g. Training shoes"></label><label>Parent category<select name="parentCategoryId"><option value="">None — main category</option>@for (category of categories(); track category.id) { <option [value]="category.id">{{ categoryStore.pathLabel(category.id) }}</option> }</select></label><label>Description<input name="categoryDescription" placeholder="Short storefront description"></label><button type="submit">Add category</button></form>
-    @if (categoryError()) { <p class="category-error">{{ categoryError() }}</p> }
-    <div class="category-list">@for (category of categoryStore.categories(); track category.id) { <article [class.child]="category.parentCategoryId"><div><span>{{ category.parentCategoryId ? '↳' : '◇' }}</span><p><strong>{{ category.name }}</strong><small>{{ category.parentCategoryId ? 'Under ' + categoryName(category.parentCategoryId) : 'Main category' }}</small></p></div><div class="category-controls"><button (click)="moveCategory(category, -1)" aria-label="Move up">↑</button><button (click)="moveCategory(category, 1)" aria-label="Move down">↓</button><button (click)="toggleCategory(category)" [class.active]="category.active">{{ category.active ? 'Visible' : 'Hidden' }}</button><button class="remove" (click)="deleteCategory(category)">×</button></div></article> }</div>
-  </aside>
-}
 } @else {
   <router-outlet />
 }
 @if (!isAuthPage()) {
-<footer class="site-footer">
-  <div class="footer-intro">
-    <a class="brand footer-brand" href="/"><span class="brand-mark">BP</span><span class="brand-name">FASHION PARK</span></a>
-    <p>Selected fashion, accessories and travel pieces for every expression.</p>
-    <div class="footer-socials" aria-label="Follow and contact BP Fashion Park">
-      <a class="social-link whatsapp" href="https://wa.me/?text=Hello%20BP%20Fashion%20Park" target="_blank" rel="noopener" aria-label="Contact BP Fashion Park on WhatsApp">
-        <span class="social-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 3.5A11.8 11.8 0 0 0 1.9 17.7L.3 23.5l5.9-1.6A11.8 11.8 0 0 0 20.5 3.5Zm-8.4 17.1c-1.8 0-3.6-.5-5.1-1.4l-.4-.2-3.5.9.9-3.4-.2-.4A9.2 9.2 0 1 1 12.1 20.6Zm5.1-6.9c-.3-.1-1.7-.8-2-.9-.3-.1-.5-.1-.7.2l-1 1.2c-.2.2-.4.2-.7.1a7.5 7.5 0 0 1-2.2-1.3 8.4 8.4 0 0 1-1.5-1.9c-.2-.3 0-.5.1-.6l.5-.5.3-.5c.1-.2 0-.4 0-.5l-.9-2.1c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.7-.7 1.9-1.4.2-.7.2-1.3.2-1.4-.1-.1-.3-.2-.6-.3Z"/></svg></span>
-        <span><small>Chat with us</small><strong>WhatsApp</strong></span>
-      </a>
-      <a class="social-link instagram" href="https://www.instagram.com/" target="_blank" rel="noopener" aria-label="Follow BP Fashion Park on Instagram">
-        <span class="social-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle class="instagram-dot" cx="17.6" cy="6.5" r="1.1"/></svg></span>
-        <span><small>See new arrivals</small><strong>Instagram</strong></span>
-      </a>
+  <footer class="site-footer">
+    <div class="footer-intro">
+      <a class="brand footer-brand" href="/"
+        ><span class="brand-mark">BP</span
+        ><span class="brand-name">FASHION PARK</span></a
+      >
+      <p>
+        Selected fashion, accessories and travel pieces for every expression.
+      </p>
+      <div
+        class="footer-socials"
+        aria-label="Follow and contact BP Fashion Park"
+      >
+        <a
+          class="social-link whatsapp"
+          [href]="whatsappContactUrl()"
+          target="_blank"
+          rel="noopener"
+          aria-label="Contact BP Fashion Park on WhatsApp"
+        >
+          <span class="social-icon"
+            ><svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M20.5 3.5A11.8 11.8 0 0 0 1.9 17.7L.3 23.5l5.9-1.6A11.8 11.8 0 0 0 20.5 3.5Zm-8.4 17.1c-1.8 0-3.6-.5-5.1-1.4l-.4-.2-3.5.9.9-3.4-.2-.4A9.2 9.2 0 1 1 12.1 20.6Zm5.1-6.9c-.3-.1-1.7-.8-2-.9-.3-.1-.5-.1-.7.2l-1 1.2c-.2.2-.4.2-.7.1a7.5 7.5 0 0 1-2.2-1.3 8.4 8.4 0 0 1-1.5-1.9c-.2-.3 0-.5.1-.6l.5-.5.3-.5c.1-.2 0-.4 0-.5l-.9-2.1c-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.7-.7 1.9-1.4.2-.7.2-1.3.2-1.4-.1-.1-.3-.2-.6-.3Z"
+              /></svg
+          ></span>
+          <span><small>Chat with us</small><strong>WhatsApp</strong></span>
+        </a>
+        @if (storeSettings.settings().instagramUrl) {
+          <a
+            class="social-link instagram"
+            [href]="storeSettings.settings().instagramUrl"
+            target="_blank"
+            rel="noopener"
+            aria-label="Follow BP Fashion Park on Instagram"
+          >
+            <span class="social-icon"
+              ><svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="2.5" y="2.5" width="19" height="19" rx="5" />
+                <circle cx="12" cy="12" r="4.2" />
+                <circle class="instagram-dot" cx="17.6" cy="6.5" r="1.1" /></svg
+            ></span>
+            <span
+              ><small>See new arrivals</small><strong>Instagram</strong></span
+            >
+          </a>
+        }
+      </div>
     </div>
-  </div>
-  <div class="footer-menu"><span>Explore</span><a href="/#shop">Shop all</a><a href="/#categories">Collections</a><a href="mailto:hello@bpfashionpark.com">Contact us</a></div>
-  <div class="footer-menu"><span>Customer care</span><a href="mailto:hello@bpfashionpark.com">Product enquiries</a><a href="/#newsletter">Join our list</a>@if (auth.user()) { <button (click)="logout()">Admin sign out</button> } @else { <a href="/admin/login">Admin access</a> }</div>
-  <div class="footer-language"><div><span>Language</span><p>Choose your preferred shopping language</p></div><div class="footer-language-options" role="group" aria-label="Choose language"><button [class.active]="language() === 'en'" [attr.aria-pressed]="language() === 'en'" (click)="setLanguage('en')"><small>English</small><strong>EN</strong></button><button [class.active]="language() === 'fr'" [attr.aria-pressed]="language() === 'fr'" (click)="setLanguage('fr')" title="French translation coming soon"><small>Français · bientôt</small><strong>FR</strong></button></div></div>
-  <div class="footer-bottom"><small>© 2026 BP Fashion Park. All rights reserved.</small><p>Style, thoughtfully selected.</p></div>
-</footer>
+    <div class="footer-menu">
+      <span>Explore</span><a href="/#shop">Shop all</a
+      ><a href="/#categories">Collections</a
+      ><a [href]="contactEmailUrl()">Contact us</a>
+    </div>
+    <div class="footer-menu">
+      <span>Customer care</span
+      ><a [href]="contactEmailUrl()">Product enquiries</a
+      ><a href="/#newsletter">Join our list</a>
+      @if (storeSettings.settings().businessAddress) {
+        <p class="footer-detail">
+          {{ storeSettings.settings().businessAddress }}
+        </p>
+      }
+      @if (storeSettings.settings().deliveryInformation) {
+        <p class="footer-detail">
+          {{ storeSettings.settings().deliveryInformation }}
+        </p>
+      }
+      @if (auth.user()) {
+        <button (click)="logout()">Admin sign out</button>
+      } @else {
+        <a href="/admin/login">Admin access</a>
+      }
+    </div>
+    <div class="footer-language">
+      <div>
+        <span>Language</span>
+        <p>Choose your preferred shopping language</p>
+      </div>
+      <div
+        class="footer-language-options"
+        role="group"
+        aria-label="Choose language"
+      >
+        <button
+          [class.active]="language() === 'en'"
+          [attr.aria-pressed]="language() === 'en'"
+          (click)="setLanguage('en')"
+        >
+          <small>English</small><strong>EN</strong></button
+        ><button
+          [class.active]="language() === 'fr'"
+          [attr.aria-pressed]="language() === 'fr'"
+          (click)="setLanguage('fr')"
+          title="French translation coming soon"
+        >
+          <small>Français · bientôt</small><strong>FR</strong>
+        </button>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <small>© 2026 BP Fashion Park. All rights reserved.</small>
+      <p>Style, thoughtfully selected.</p>
+    </div>
+  </footer>
 }

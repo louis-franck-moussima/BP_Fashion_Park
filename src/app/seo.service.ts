@@ -1,12 +1,14 @@
 import { Injectable, inject } from '@angular/core';
 import { Meta, Title } from '@angular/platform-browser';
 import { Category } from './category.model';
-import { Product, productPriceLabel, totalStock } from './product.model';
+import { Product, totalStock } from './product.model';
+import { StoreSettingsService } from './store-settings.service';
 
 @Injectable({ providedIn: 'root' })
 export class SeoService {
   private readonly title = inject(Title);
   private readonly meta = inject(Meta);
+  private readonly storeSettings = inject(StoreSettingsService);
   private readonly brand = 'BP Fashion Park';
 
   setHome(): void {
@@ -28,7 +30,7 @@ export class SeoService {
   setProduct(product: Product, categoryName: string): void {
     const availability =
       totalStock(product) > 0 ? 'Available now' : 'Currently out of stock';
-    const description = `${product.description} ${productPriceLabel(product)}. ${availability} in ${categoryName}.`;
+    const description = `${product.description} ${this.storeSettings.priceLabel(product)}. ${availability} in ${categoryName}.`;
     const image = product.images.find((item) =>
       /^https:\/\//i.test(item.url),
     )?.url;

@@ -7,14 +7,36 @@ export interface ProductColor {
   stock?: number;
 }
 
+export interface WigDetails {
+  length?: string;
+  texture?: string;
+  laceType?: string;
+  density?: string;
+}
+
+export type StockMovementReason = 'increase' | 'decrease' | 'restock';
+
+export interface StockMovement {
+  id: string;
+  productId: string;
+  delta: number;
+  previousStock: number;
+  newStock: number;
+  reason: StockMovementReason;
+  createdAt: number;
+}
+
 export interface Product {
   id: string;
   name: string;
+  sku?: string;
   category: ProductCategory;
   price: number;
+  originalPrice?: number;
   priceMode?: PriceMode;
   negotiable?: boolean;
   stock?: number;
+  lowStockThreshold?: number;
   art: string;
   description: string;
   images: ProductImage[];
@@ -24,6 +46,10 @@ export interface Product {
   ageRange?: string;
   tags?: string[];
   featured?: boolean;
+  newArrival?: boolean;
+  limitedQuantity?: boolean;
+  relatedProductIds?: string[];
+  wigDetails?: WigDetails;
   createdAt: number;
 }
 
@@ -34,7 +60,8 @@ export interface ProductImage {
 }
 
 export const totalStock = (product: Product) =>
-  product.stock ?? product.colors.reduce((sum, color) => sum + (color.stock ?? 0), 0);
+  product.stock ??
+  product.colors.reduce((sum, color) => sum + (color.stock ?? 0), 0);
 
 export const productPriceLabel = (product: Product) => {
   if (product.priceMode === 'on-request') return 'Price on request';

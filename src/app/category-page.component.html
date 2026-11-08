@@ -1,19 +1,139 @@
 <main class="category-page">
   @if (catalogLoading()) {
-    <section class="category-state" role="status"><span></span><h1>Loading collection</h1><p>We’re retrieving the latest categories, products and availability.</p></section>
+    <section class="category-state" role="status">
+      <span></span>
+      <h1>Loading collection</h1>
+      <p>We’re retrieving the latest categories, products and availability.</p>
+    </section>
   } @else if (catalogError()) {
-    <section class="category-state category-state-error" role="alert"><strong>!</strong><h1>Collection temporarily unavailable</h1><p>Please refresh the page in a moment. We are not displaying reference stock in place of live products.</p><a routerLink="/">Return home</a></section>
+    <section class="category-state category-state-error" role="alert">
+      <strong>!</strong>
+      <h1>Collection temporarily unavailable</h1>
+      <p>
+        Please refresh the page in a moment. We are not displaying reference
+        stock in place of live products.
+      </p>
+      <a routerLink="/">Return home</a>
+    </section>
   } @else if (category(); as current) {
     <section class="category-hero">
-      <nav class="breadcrumbs" aria-label="Breadcrumb"><a routerLink="/">Home</a>@for (item of breadcrumbs(); track item.id; let last = $last) { <span>／</span>@if (last) { <strong>{{ item.name }}</strong> } @else { <a [routerLink]="categoryUrl(item.id)">{{ item.name }}</a> } }</nav>
-      <p>Curated collection</p><h1>{{ current.name }}</h1><div><span>{{ children().length ? children().length + ' categories' : products().length + (products().length === 1 ? ' piece' : ' pieces') }}</span><p>{{ current.description }}</p></div>
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a routerLink="/">Home</a>
+        @for (item of breadcrumbs(); track item.id; let last = $last) {
+          <span>／</span>
+          @if (last) {
+            <strong>{{ item.name }}</strong>
+          } @else {
+            <a [routerLink]="categoryUrl(item.id)">{{ item.name }}</a>
+          }
+        }
+      </nav>
+      <p>Curated collection</p>
+      <h1>{{ current.name }}</h1>
+      <div>
+        <span>{{
+          children().length
+            ? children().length + " categories"
+            : products().length +
+              (products().length === 1 ? " piece" : " pieces")
+        }}</span>
+        <p>{{ current.description }}</p>
+      </div>
     </section>
     @if (children().length) {
-      <section class="subcategories"><div class="section-copy"><p>Explore further</p><h2>Shop {{ current.name }}</h2></div><div class="subcategory-grid">@for (child of children(); track child.id; let i = $index) { <a [routerLink]="categoryUrl(child.id)" [style.--tone]="i"><span>0{{ i + 1 }}</span><div><h3>{{ child.name }}</h3><p>{{ child.description }}</p>@if (categoryStore.children(child.id).length) { <div class="category-child-list">@for (grandchild of categoryStore.children(child.id); track grandchild.id) { <span>{{ grandchild.name }}</span> }</div> }</div></a> }</div></section>
+      <section class="subcategories">
+        <div class="section-copy">
+          <p>Explore further</p>
+          <h2>Shop {{ current.name }}</h2>
+        </div>
+        <div class="subcategory-grid">
+          @for (child of children(); track child.id; let i = $index) {
+            <a [routerLink]="categoryUrl(child.id)" [style.--tone]="i"
+              ><span>0{{ i + 1 }}</span>
+              <div>
+                <h3>{{ child.name }}</h3>
+                <p>{{ child.description }}</p>
+                @if (categoryStore.children(child.id).length) {
+                  <div class="category-child-list">
+                    @for (
+                      grandchild of categoryStore.children(child.id);
+                      track grandchild.id
+                    ) {
+                      <span>{{ grandchild.name }}</span>
+                    }
+                  </div>
+                }
+              </div></a
+            >
+          }
+        </div>
+      </section>
     } @else {
-      <section class="category-products"><div class="section-copy"><p>Selected for you</p><h2>{{ current.name }} collection</h2></div><div class="category-product-grid">@for (product of products(); track product.id) { <article><button class="category-product-image" (click)="openProduct(product.id)">@if (product.images.length) { <img [src]="product.images[0].url" [alt]="product.images[0].alt || product.name"> } @else { <span>{{ product.name.charAt(0) }}</span> }<small [class.out]="stockOf(product) === 0">{{ stockOf(product) === 0 ? 'Out of stock' : stockOf(product) + ' available' }}</small></button><div><button (click)="openProduct(product.id)">{{ product.name }}</button><strong>{{ priceLabel(product) }}</strong></div><p>{{ categoryStore.name(product.category) }}</p></article> } @empty { <div class="category-empty"><span>◇</span><h3>This collection is ready for its first pieces.</h3><p>The owner can add products here from the admin workspace.</p></div> }</div></section>
+      <section class="category-products">
+        <div class="section-copy">
+          <p>Selected for you</p>
+          <h2>{{ current.name }} collection</h2>
+        </div>
+        <div class="category-product-grid">
+          @for (product of products(); track product.id) {
+            <article>
+              <button
+                class="category-product-image"
+                (click)="openProduct(product.id)"
+              >
+                <span class="category-badges">
+                  @if (product.newArrival) {
+                    <b>New</b>
+                  }
+                  @if (product.featured) {
+                    <b>Featured</b>
+                  }
+                  @if (product.limitedQuantity) {
+                    <b>Limited</b>
+                  }
+                </span>
+                @if (product.images.length) {
+                  <img
+                    [src]="product.images[0].url"
+                    [alt]="product.images[0].alt || product.name"
+                  />
+                } @else {
+                  <span>{{ product.name.charAt(0) }}</span>
+                }
+                <small [class.out]="stockOf(product) === 0">{{
+                  stockOf(product) === 0
+                    ? "Out of stock"
+                    : stockOf(product) + " available"
+                }}</small>
+              </button>
+              <div>
+                <button (click)="openProduct(product.id)">
+                  {{ product.name }}</button
+                ><span class="category-prices">
+                  @if (product.originalPrice) {
+                    <del>{{ originalPriceLabel(product) }}</del>
+                  }
+                  <strong>{{ priceLabel(product) }}</strong></span
+                >
+              </div>
+              <p>{{ categoryStore.name(product.category) }}</p>
+            </article>
+          } @empty {
+            <div class="category-empty">
+              <span>◇</span>
+              <h3>This collection is ready for its first pieces.</h3>
+              <p>The owner can add products here from the admin workspace.</p>
+            </div>
+          }
+        </div>
+      </section>
     }
   } @else if (resolved()) {
-    <section class="category-not-found"><span>404</span><h1>Collection not found</h1><p>This category may have been renamed or removed by the store owner.</p><a routerLink="/">Return to the shop</a></section>
+    <section class="category-not-found">
+      <span>404</span>
+      <h1>Collection not found</h1>
+      <p>This category may have been renamed or removed by the store owner.</p>
+      <a routerLink="/">Return to the shop</a>
+    </section>
   }
 </main>
