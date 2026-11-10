@@ -26,10 +26,10 @@
     <section class="product-layout">
       <div class="gallery">
         <div class="gallery-main" [class]="'gallery-main ' + item.art">
-          @if (item.images.length) {
+          @if (visibleImages().length) {
             <img
-              [src]="item.images[selectedImage()].url"
-              [alt]="item.images[selectedImage()].alt || item.name"
+              [src]="visibleImages()[selectedImage()].url"
+              [alt]="visibleImages()[selectedImage()].alt || item.name"
             />
           } @else {
             <div class="fallback-product">
@@ -48,9 +48,9 @@
             }
           </span>
         </div>
-        @if (item.images.length > 1) {
+        @if (visibleImages().length > 1) {
           <div class="gallery-thumbs">
-            @for (image of item.images; track image.url; let i = $index) {
+            @for (image of visibleImages(); track image.url; let i = $index) {
               <button
                 [class.active]="selectedImage() === i"
                 (click)="selectedImage.set(i)"
@@ -136,11 +136,12 @@
               <button
                 [class.selected]="selectedColor()?.name === color.name"
                 (click)="selectColor(color)"
+                [disabled]="color.stock === 0"
                 [attr.aria-label]="'Select ' + color.name"
               >
                 <i [style.background]="color.hex"></i
                 ><span>{{ color.name }}</span
-                ><small>Color option</small>
+                ><small>{{ color.stock !== undefined ? color.stock + " available" : "Color option" }}</small>
               </button>
             }
           </div>
@@ -164,11 +165,11 @@
         }
         <button
           class="contact-button"
-          [disabled]="!selectedColor() || totalStock() === 0"
+          [disabled]="!selectedColor() || selectedColorStock() === 0"
           (click)="addToBag()"
         >
           {{
-            totalStock() > 0 ? "Add to request bag" : "Currently unavailable"
+            selectedColorStock() > 0 ? "Add to request bag" : "Selected color unavailable"
           }}
         </button>
         <div class="product-notes">

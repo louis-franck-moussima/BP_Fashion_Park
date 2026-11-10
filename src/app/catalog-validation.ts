@@ -1,5 +1,5 @@
 import { Category } from './category.model';
-import { Product } from './product.model';
+import { Product, totalStock } from './product.model';
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -43,9 +43,8 @@ export function validateProduct(
   )
     errors.push('Original price must be higher than the current price.');
   if (
-    !Number.isInteger(product.stock) ||
-    (product.stock ?? 0) < 0 ||
-    (product.stock ?? 0) > 100_000
+    product.stock !== undefined &&
+    (!Number.isInteger(product.stock) || product.stock < 0 || product.stock > 100_000)
   )
     errors.push('Stock must be a whole number between 0 and 100,000.');
   if (
@@ -77,6 +76,19 @@ export function validateProduct(
     );
   if (!unique(product.colors.map((color) => color.name)))
     errors.push('Color names must be unique.');
+  if (
+    product.colors.some(
+      (color) =>
+        color.stock !== undefined &&
+        (!Number.isInteger(color.stock) || color.stock < 0 || color.stock > 100_000),
+    )
+  )
+    errors.push('Color stock must be a whole number between 0 and 100,000.');
+  if (totalStock(product) > 100_000)
+    errors.push('Total stock must not exceed 100,000 units.');
+  const colorNames = new Set(product.colors.map((color) => color.name.toLowerCase()));
+  if (product.images.some((image) => image.color && !colorNames.has(image.color.toLowerCase())))
+    errors.push('Each image color must match one of the product colors.');
   for (const [label, values, maximum] of [
     ['sizes', product.sizes ?? [], 30],
     ['audiences', product.audiences ?? [], 10],

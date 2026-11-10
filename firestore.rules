@@ -119,7 +119,7 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow create: if isAdmin()
         && request.resource.data.keys().hasAll(['id', 'productId', 'delta', 'previousStock', 'newStock', 'reason', 'createdAt'])
-        && request.resource.data.keys().hasOnly(['id', 'productId', 'delta', 'previousStock', 'newStock', 'reason', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['id', 'productId', 'delta', 'previousStock', 'newStock', 'reason', 'color', 'createdAt'])
         && request.resource.data.id == movementId
         && request.resource.data.productId == productId
         && request.resource.data.delta is int && request.resource.data.delta != 0
@@ -127,8 +127,14 @@ service cloud.firestore {
         && request.resource.data.newStock is int && request.resource.data.newStock >= 0
         && request.resource.data.newStock == request.resource.data.previousStock + request.resource.data.delta
         && request.resource.data.reason in ['increase', 'decrease', 'restock']
+        && (!('color' in request.resource.data) || (request.resource.data.color is string && request.resource.data.color.size() >= 1 && request.resource.data.color.size() <= 40))
         && (request.resource.data.reason == 'decrease' ? request.resource.data.delta < 0 : request.resource.data.delta > 0)
-        && getAfter(/databases/$(database)/documents/products/$(productId)).data.stock == request.resource.data.newStock
+        && (
+          ('color' in request.resource.data
+            && getAfter(/databases/$(database)/documents/products/$(productId)).data.colors != resource.data.colors)
+          || (!('color' in request.resource.data)
+            && getAfter(/databases/$(database)/documents/products/$(productId)).data.stock == request.resource.data.newStock)
+        )
         && request.resource.data.createdAt is number;
       allow update, delete: if false;
     }

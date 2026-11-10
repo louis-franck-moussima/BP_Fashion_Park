@@ -103,6 +103,7 @@ export class ProductRepository {
     productId: string,
     delta: number,
     reason: StockMovementReason,
+    colorName?: string,
   ): Promise<StockMovement> {
     if (!this.db)
       throw new Error('Firebase must be connected to adjust stock.');
@@ -119,6 +120,22 @@ export class ProductRepository {
       if (!Number.isInteger(delta) || delta === 0)
         throw new Error('Stock adjustment must be a non-zero whole number.');
       if (newStock < 0) throw new Error('Stock cannot be reduced below zero.');
+      let colors = product.colors;
+      if (colorName) {
+        if (colors.some((color) => color.stock === undefined))
+          throw new Error('Allocate the existing stock by color in the product editor first.');
+        const selected = colors.find(
+          (color) => color.name.toLowerCase() === colorName.toLowerCase(),
+        );
+        if (!selected) throw new Error('The selected color no longer exists.');
+        if ((selected.stock ?? 0) + delta < 0)
+          throw new Error(`${selected.name} stock cannot be reduced below zero.`);
+        colors = colors.map((color) =>
+          color.name === selected.name
+            ? { ...color, stock: (color.stock ?? 0) + delta }
+            : color,
+        );
+      }
       const movement: StockMovement = {
         id: movementRef.id,
         productId,
@@ -126,9 +143,10 @@ export class ProductRepository {
         previousStock,
         newStock,
         reason,
+        ...(colorName ? { color: colorName } : {}),
         createdAt: Date.now(),
       };
-      transaction.update(productRef, { stock: newStock });
+      transaction.update(productRef, colorName ? { colors } : { stock: newStock });
       transaction.set(movementRef, movement);
       return movement;
     });

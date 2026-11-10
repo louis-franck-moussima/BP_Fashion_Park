@@ -40,6 +40,7 @@ export interface StockMovement {
   previousStock: number;
   newStock: number;
   reason: StockMovementReason;
+  color?: string;
   createdAt: number;
 }
 
@@ -75,11 +76,13 @@ export interface ProductImage {
   url: string;
   publicId?: string;
   alt: string;
+  color?: string;
 }
 
 export const totalStock = (product: Product) =>
-  product.stock ??
-  product.colors.reduce((sum, color) => sum + (color.stock ?? 0), 0);
+  product.colors.some((color) => color.stock !== undefined)
+    ? product.colors.reduce((sum, color) => sum + (color.stock ?? 0), 0)
+    : product.stock ?? 0;
 
 export const productStatus = (product: Product): ProductPublicationStatus =>
   product.status ?? 'published';

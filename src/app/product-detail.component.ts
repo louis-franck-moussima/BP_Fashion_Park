@@ -46,9 +46,23 @@ export class ProductDetailComponent implements OnInit {
       ? product
       : undefined;
   });
+  readonly visibleImages = computed(() => {
+    const product = this.product();
+    if (!product) return [];
+    const color = this.selectedColor()?.name.toLowerCase();
+    if (!color) return product.images;
+    const matching = product.images.filter(
+      (image) => image.color?.toLowerCase() === color,
+    );
+    return matching.length ? matching : product.images;
+  });
   readonly totalStock = computed(() =>
     this.product() ? totalStock(this.product()!) : 0,
   );
+  readonly selectedColorStock = computed(() => {
+    const color = this.selectedColor();
+    return color?.stock ?? this.totalStock();
+  });
   priceLabel(product: Product): string {
     return this.storeSettings.priceLabel(product);
   }
@@ -128,6 +142,7 @@ export class ProductDetailComponent implements OnInit {
 
   selectColor(color: ProductColor): void {
     this.selectedColor.set(color);
+    this.selectedImage.set(0);
   }
   selectSize(size: string): void {
     this.selectedSize.set(size);
@@ -135,7 +150,7 @@ export class ProductDetailComponent implements OnInit {
   addToBag(): void {
     const product = this.product();
     const color = this.selectedColor();
-    if (product && color && this.totalStock() > 0)
+    if (product && color && this.selectedColorStock() > 0)
       this.cart.add(product, color.name, this.selectedSize() ?? '');
   }
   categoryName(id: string): string {
@@ -160,7 +175,11 @@ export class ProductDetailComponent implements OnInit {
 
   private selectInitialColor(): void {
     const product = this.product();
-    this.selectedColor.set(product?.colors[0] ?? null);
+    this.selectedColor.set(
+      product?.colors.find((color) => (color.stock ?? this.totalStock()) > 0) ??
+        product?.colors[0] ??
+        null,
+    );
   }
   private selectInitialSize(): void {
     this.selectedSize.set(this.product()?.sizes?.[0] ?? null);

@@ -39,6 +39,7 @@ import {
 } from './inventory-csv.service';
 import { AdminActivityService } from './admin-activity.service';
 import { AdminActivityType, NewAdminActivity } from './admin-activity.model';
+import { FlatpickrDirective } from './flatpickr.directive';
 
 type AdminSection =
   | 'overview'
@@ -62,7 +63,7 @@ type InventoryFilter =
 
 @Component({
   selector: 'app-admin-dashboard',
-  imports: [RouterLink, AdminSubcategoryManagerComponent],
+  imports: [RouterLink, AdminSubcategoryManagerComponent, FlatpickrDirective],
   templateUrl: './admin-dashboard.component.html',
   styleUrls: [
     './admin-dashboard.component.css',
@@ -78,6 +79,7 @@ type InventoryFilter =
     './admin-dashboard-actions.component.css',
     './admin-purchasing.component.css',
     './admin-activity.component.css',
+    './admin-image-colors.component.css',
   ],
 })
 export class AdminDashboardComponent implements OnInit {
@@ -137,6 +139,28 @@ export class AdminDashboardComponent implements OnInit {
   readonly productEditorOpen = signal(false);
   readonly editingProductId = signal<string | null>(null);
   readonly pendingImages = signal<ProductImage[]>([]);
+  readonly editorCategoryId = signal('');
+  readonly editorColorOptions = signal<string[]>([]);
+  readonly editorColorStocks = signal<Record<string, number | null>>({});
+  readonly editorVariantStockTotal = computed(() =>
+    Object.values(this.editorColorStocks()).reduce<number>(
+      (total, stock) => total + (stock ?? 0), 0,
+    ),
+  );
+  readonly editorDisplayedStock = computed(() => {
+    const stocks = Object.values(this.editorColorStocks());
+    if (stocks.some((stock) => stock !== null)) return this.editorVariantStockTotal();
+    const existing = this.editingProductId()
+      ? this.productStore.find(this.editingProductId()!)
+      : undefined;
+    return existing ? totalStock(existing) : 0;
+  });
+  readonly imageUploadColor = signal('');
+  readonly editorIsWig = computed(() =>
+    this.categoryStore.path(this.editorCategoryId()).some(
+      (category) => category.id.toLowerCase().includes('wig') || category.name.toLowerCase().includes('wig'),
+    ),
+  );
   readonly removedImages = signal<ProductImage[]>([]);
   readonly uploadedThisSession = signal<ProductImage[]>([]);
   readonly productEditorDirty = signal(false);
@@ -413,6 +437,10 @@ export class AdminDashboardComponent implements OnInit {
     if (!this.auth.user()) return;
     this.editingProductId.set(null);
     this.pendingImages.set([]);
+    this.editorCategoryId.set(this.categoryStore.active()[0]?.id ?? '');
+    this.editorColorOptions.set([]);
+    this.editorColorStocks.set({});
+    this.imageUploadColor.set('');
     this.removedImages.set([]);
     this.uploadedThisSession.set([]);
     this.productEditorDirty.set(false);
@@ -424,6 +452,12 @@ export class AdminDashboardComponent implements OnInit {
     if (!this.auth.user()) return;
     this.editingProductId.set(product.id);
     this.pendingImages.set([...(product.images ?? [])]);
+    this.editorCategoryId.set(product.category);
+    this.editorColorOptions.set(product.colors.map((color) => color.name));
+    this.editorColorStocks.set(Object.fromEntries(
+      product.colors.map((color) => [color.name, color.stock ?? null]),
+    ));
+    this.imageUploadColor.set('');
     this.removedImages.set([]);
     this.uploadedThisSession.set([]);
     this.productEditorDirty.set(false);
@@ -436,6 +470,12 @@ export class AdminDashboardComponent implements OnInit {
     if (!this.auth.user()) return;
     this.editingProductId.set(null);
     this.pendingImages.set([...(product.images ?? [])]);
+    this.editorCategoryId.set(product.category);
+    this.editorColorOptions.set(product.colors.map((color) => color.name));
+    this.editorColorStocks.set(Object.fromEntries(
+      product.colors.map((color) => [color.name, color.stock ?? 0]),
+    ));
+    this.imageUploadColor.set('');
     this.removedImages.set([]);
     this.uploadedThisSession.set([]);
     this.productEditorDirty.set(false);
@@ -599,14 +639,16 @@ export class AdminDashboardComponent implements OnInit {
   ): Promise<void> {
     if (!this.auth.user() || this.stockActionId()) return;
     if (totalStock(product) + delta < 0) return;
+    const color = this.chooseStockColor(product);
+    if (product.colors.length && !color) return;
     this.stockActionId.set(product.id);
     this.inventoryError.set('');
     try {
-      await this.productStore.adjustStock(product.id, delta, reason);
+      await this.productStore.adjustStock(product.id, delta, reason, color);
       this.recordActivity({
         type: 'stock_adjusted', entityType: 'product', entityId: product.id,
         title: `Stock changed for ${product.name}`,
-        description: `${delta > 0 ? '+' : ''}${delta} units · ${totalStock(product)} to ${totalStock(product) + delta}.`,
+        description: `${delta > 0 ? '+' : ''}${delta} units${color ? ` · ${color}` : ''} · ${totalStock(product)} to ${totalStock(product) + delta}.`,
       });
       this.notify(`Stock for “${product.name}” updated.`);
     } catch (error) {
@@ -634,11 +676,36 @@ export class AdminDashboardComponent implements OnInit {
     await this.adjustStock(product, quantity, 'restock');
   }
   movementLabel(movement: StockMovement): string {
-    return movement.reason === 'restock'
+    const action = movement.reason === 'restock'
       ? 'Restocked'
       : movement.delta > 0
         ? 'Added'
         : 'Removed';
+    return movement.color ? `${action} · ${movement.color}` : action;
+  }
+  private chooseStockColor(product: Product): string | undefined {
+    if (!product.colors.length) return undefined;
+    if (product.colors.some((color) => color.stock === undefined)) {
+      this.inventoryError.set(
+        `Open “${product.name}” and allocate its existing stock by color first.`,
+      );
+      return undefined;
+    }
+    if (product.colors.length === 1) return product.colors[0].name;
+    if (typeof window === 'undefined') return undefined;
+    const answer = window.prompt(
+      `Which color should be updated?\n${product.colors.map((color) => `${color.name}: ${color.stock ?? 0}`).join('\n')}`,
+      product.colors[0].name,
+    );
+    if (!answer) return undefined;
+    const match = product.colors.find(
+      (color) => color.name.toLowerCase() === answer.trim().toLowerCase(),
+    );
+    if (!match) {
+      this.inventoryError.set('Enter one of the listed color names.');
+      return undefined;
+    }
+    return match.name;
   }
   movementDate(timestamp: number): string {
     return new Intl.DateTimeFormat('en-GB', {
@@ -769,7 +836,10 @@ export class AdminDashboardComponent implements OnInit {
         document.querySelector<HTMLInputElement>(
           '.dashboard-product-form input[name="name"]',
         )?.value || 'Product';
-      const images = await this.cloudinary.uploadMany(files, name);
+      const color = this.imageUploadColor();
+      const images = (await this.cloudinary.uploadMany(files, name)).map((image) =>
+        color ? { ...image, color } : image,
+      );
       this.pendingImages.update((current) => [...current, ...images]);
       this.uploadedThisSession.update((current) => [...current, ...images]);
       this.productEditorDirty.set(true);
@@ -806,6 +876,31 @@ export class AdminDashboardComponent implements OnInit {
       return result;
     });
   }
+  setEditorCategory(categoryId: string): void {
+    this.editorCategoryId.set(categoryId);
+  }
+  updateEditorColors(value: string): void {
+    const colors = this.parseColors(value).map((color) => color.name);
+    this.editorColorOptions.set(colors);
+    this.editorColorStocks.update((current) =>
+      Object.fromEntries(colors.map((color) => [color, current[color] ?? (this.editingProductId() ? null : 0)])),
+    );
+    if (this.imageUploadColor() && !colors.includes(this.imageUploadColor()))
+      this.imageUploadColor.set('');
+  }
+  setEditorColorStock(color: string, value: string): void {
+    const parsed = value === '' ? null : Math.max(0, Math.trunc(Number(value)) || 0);
+    this.editorColorStocks.update((stocks) => ({ ...stocks, [color]: parsed }));
+    this.productEditorDirty.set(true);
+  }
+  assignImageColor(index: number, color: string): void {
+    this.pendingImages.update((images) =>
+      images.map((image, imageIndex) =>
+        imageIndex === index ? { ...image, color: color || undefined } : image,
+      ),
+    );
+    this.productEditorDirty.set(true);
+  }
   async saveProduct(event: Event): Promise<void> {
     event.preventDefault();
     if (!this.auth.user()) return;
@@ -826,6 +921,13 @@ export class AdminDashboardComponent implements OnInit {
       density: String(data.get('wigDensity') || '').trim(),
     };
     const purchaseCost = Number(data.get('purchaseCost'));
+    const parsedColors = this.parseColors(String(data.get('colors') || ''));
+    const colorStocks = this.editorColorStocks();
+    const usesColorStock = parsedColors.some((color) => colorStocks[color.name] !== null);
+    const colors = parsedColors.map((color) => ({
+      ...color,
+      ...(usesColorStock ? { stock: colorStocks[color.name] ?? 0 } : {}),
+    }));
     const purchasingInfo: ProductPurchasingInfo = {
       productId: existing?.id ?? `product-${Date.now()}`,
       supplierName: String(data.get('supplierName') || '').trim(),
@@ -849,9 +951,9 @@ export class AdminDashboardComponent implements OnInit {
       ...(originalPrice > 0 ? { originalPrice } : {}),
       priceMode: String(data.get('priceMode') || 'fixed') as PriceMode,
       negotiable: data.get('negotiable') === 'on',
-      stock: existing
-        ? totalStock(existing)
-        : Math.max(0, Number(data.get('stock')) || 0),
+      ...(!usesColorStock
+        ? { stock: existing ? totalStock(existing) : Math.max(0, Number(data.get('stock')) || 0) }
+        : {}),
       lowStockThreshold: Math.max(
         0,
         Number(data.get('lowStockThreshold')) || 0,
@@ -859,7 +961,7 @@ export class AdminDashboardComponent implements OnInit {
       art: String(data.get('art') || 'dress'),
       description: String(data.get('description') || '').trim(),
       images: this.pendingImages(),
-      colors: this.parseColors(String(data.get('colors') || '')),
+      colors,
       sizes: this.parseList(String(data.get('sizes') || '')),
       audiences: this.parseList(String(data.get('audiences') || '')),
       ageRange: String(data.get('ageRange') || '').trim(),
@@ -868,7 +970,7 @@ export class AdminDashboardComponent implements OnInit {
       newArrival: data.get('newArrival') === 'on',
       limitedQuantity: data.get('limitedQuantity') === 'on',
       relatedProductIds: data.getAll('relatedProductIds').map(String),
-      ...(Object.values(wigDetails).some(Boolean) ? { wigDetails } : {}),
+      ...(this.editorIsWig() && Object.values(wigDetails).some(Boolean) ? { wigDetails } : {}),
       createdAt: existing?.createdAt ?? Date.now(),
     };
     const validationErrors = validateProduct(
@@ -1355,8 +1457,9 @@ export class AdminDashboardComponent implements OnInit {
       purchasing?.supplierReference ?? '';
     (form.elements.namedItem('purchaseCost') as HTMLInputElement).value =
       purchasing?.purchaseCost ? String(purchasing.purchaseCost) : '';
-    (form.elements.namedItem('purchaseDate') as HTMLInputElement).value =
-      purchasing?.purchaseDate ?? '';
+    const purchaseDateInput = form.elements.namedItem('purchaseDate') as HTMLInputElement;
+    purchaseDateInput.value = purchasing?.purchaseDate ?? '';
+    purchaseDateInput.dispatchEvent(new Event('flatpickr-sync'));
     (form.elements.namedItem('batchReference') as HTMLInputElement).value =
       purchasing?.batchReference ?? '';
     (form.elements.namedItem('purchasingNotes') as HTMLTextAreaElement).value =

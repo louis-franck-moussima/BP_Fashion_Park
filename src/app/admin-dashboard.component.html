@@ -614,7 +614,7 @@
                 <div class="request-follow-up-grid">
                   <form (submit)="saveRequestFollowUp(request, $event)">
                     <label>Private owner notes<textarea name="ownerNotes" rows="5" maxlength="2000" [value]="request.ownerNotes || ''" placeholder="What was discussed? Preferences, delivery details, next action…"></textarea></label>
-                    <label>Next follow-up<input name="followUpAt" type="datetime-local" [value]="followUpInputValue(request)" /></label>
+                    <label>Next follow-up<input name="followUpAt" type="text" appFlatpickr="datetime" [value]="followUpInputValue(request)" placeholder="Choose date and time" /></label>
                     <small>These notes are private and never shown to the customer.</small>
                     <button type="submit" [disabled]="followUpSavingId() === request.id">{{ followUpSavingId() === request.id ? "Saving…" : "Save follow-up" }}</button>
                   </form>
@@ -799,7 +799,7 @@
       </select><small>New products remain private until you publish them.</small></label>
       <div class="editor-form-row">
         <label
-          >Category<select name="category" required>
+          >Category<select name="category" required (change)="setEditorCategory($any($event.target).value)">
             @for (category of categoryStore.active(); track category.id) {
               <option [value]="category.id">
                 {{ categoryStore.pathLabel(category.id) }}
@@ -847,12 +847,10 @@
             max="100000"
             step="1"
             required
-            value="0"
-            [readonly]="!!editingProductId()"
+            [value]="editorDisplayedStock()"
+            readonly
           /><small>{{
-            editingProductId()
-              ? "Use the inventory controls to change existing stock."
-              : "Initial quantity for this new product."
+            "Calculated automatically from the quantities assigned to each color."
           }}</small></label
         ><label
           >Low-stock threshold<input
@@ -914,12 +912,45 @@
           maxlength="1000"
         ></textarea>
       </label>
+      <label
+        >Available colors<input
+          name="colors"
+          required
+          maxlength="1000"
+          (input)="updateEditorColors($any($event.target).value)"
+          placeholder="Black|#222222, Red|#a84232"
+        /><small
+          >Add the colors first, then upload one or several images for each color. Format: name | #hex, separated by commas.</small
+        ></label
+      >
+      @if (editorColorOptions().length) {
+        <section class="color-stock-editor">
+          <header><span><strong>Stock by color</strong><small>Enter the available quantity for every color.</small></span><b>{{ editorDisplayedStock() }} total</b></header>
+          <div>
+            @for (color of editorColorOptions(); track color) {
+              <label><span>{{ color }}</span><input type="number" min="0" max="100000" step="1" [value]="editorColorStocks()[color] ?? ''" (input)="setEditorColorStock(color, $any($event.target).value)" placeholder="0" /></label>
+            }
+          </div>
+          @if (editingProductId() && editorColorStocks()[editorColorOptions()[0]] === null) {
+            <p>This product currently has one combined stock total. Enter quantities here to allocate it by color.</p>
+          }
+        </section>
+      }
       <div class="dashboard-media">
         <div>
           <span
             ><strong>Product images</strong
-            ><small>The first image is the storefront cover.</small></span
-          ><label class="dashboard-upload"
+            ><small>Choose a color, then add one or several images.</small></span
+          ><div class="color-upload-controls">
+            <label>Images for
+              <select [value]="imageUploadColor()" (change)="imageUploadColor.set($any($event.target).value)">
+                <option value="">All colors / general</option>
+                @for (color of editorColorOptions(); track color) {
+                  <option [value]="color">{{ color }}</option>
+                }
+              </select>
+            </label>
+          <label class="dashboard-upload"
             >{{ uploadingImages() ? "Uploading…" : "＋ Add images"
             }}<input
               type="file"
@@ -927,7 +958,7 @@
               multiple
               (change)="selectImages($event)"
               [disabled]="uploadingImages()"
-          /></label>
+          /></label></div>
         </div>
         @if (pendingImages().length) {
           <section>
@@ -935,6 +966,14 @@
               <figure>
                 <img [src]="image.url" [alt]="image.alt" />
                 <figcaption>{{ i === 0 ? "Cover" : i + 1 }}</figcaption>
+                <label class="image-color-link">Color
+                  <select [value]="image.color || ''" (change)="assignImageColor(i, $any($event.target).value)">
+                    <option value="">All colors / general</option>
+                    @for (color of editorColorOptions(); track color) {
+                      <option [value]="color">{{ color }}</option>
+                    }
+                  </select>
+                </label>
                 <div>
                   <button
                     type="button"
@@ -958,17 +997,6 @@
         }
       </div>
       <label
-        >Available colors<input
-          name="colors"
-          required
-          maxlength="1000"
-          placeholder="Black|#222222, Red|#a84232"
-        /><small
-          >Use unique names and six-digit hex colors. Format: name | #hex,
-          separated by commas.</small
-        ></label
-      >
-      <label
         >Available sizes or lengths<input
           name="sizes"
           placeholder="36, 37, 38 · S, M, L · 12 in, 14 in"
@@ -977,6 +1005,7 @@
           Separate values with commas.</small
         ></label
       >
+      @if (editorIsWig()) {
       <section class="wig-fields">
         <div>
           <strong>Wig details</strong
@@ -1009,6 +1038,7 @@
           /></label>
         </div>
       </section>
+      }
       <section class="purchasing-fields">
         <div class="purchasing-heading">
           <span>
@@ -1027,7 +1057,7 @@
         </div>
         <div class="editor-form-row">
           <label>Purchase cost<input name="purchaseCost" type="number" min="0" max="1000000" step="0.01" placeholder="Optional" /><small>Private cost in the store currency.</small></label>
-          <label>Purchase date<input name="purchaseDate" type="date" /></label>
+          <label>Purchase date<input name="purchaseDate" type="text" appFlatpickr="date" placeholder="Choose a date" /></label>
         </div>
         <label>Purchasing notes<textarea name="purchasingNotes" rows="3" maxlength="2000" placeholder="Quality, sizing, minimum order or reorder availability…"></textarea></label>
       </section>

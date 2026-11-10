@@ -282,15 +282,28 @@ export class ProductStore {
     productId: string,
     delta: number,
     reason: StockMovementReason,
+    colorName?: string,
   ): Promise<void> {
     const movement = await this.repository.adjustStock(
       productId,
       delta,
       reason,
+      colorName,
     );
     this.products.update((items) =>
       items.map((item) =>
-        item.id === productId ? { ...item, stock: movement.newStock } : item,
+        item.id === productId
+          ? movement.color
+            ? {
+                ...item,
+                colors: item.colors.map((color) =>
+                  color.name === movement.color
+                    ? { ...color, stock: (color.stock ?? 0) + movement.delta }
+                    : color,
+                ),
+              }
+            : { ...item, stock: movement.newStock }
+          : item,
       ),
     );
     this.stockHistory.update((items) =>
