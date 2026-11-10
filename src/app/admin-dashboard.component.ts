@@ -81,6 +81,7 @@ type InventoryFilter =
     './admin-purchasing.component.css',
     './admin-activity.component.css',
     './admin-image-colors.component.css',
+    './admin-responsive.component.css',
   ],
 })
 export class AdminDashboardComponent implements OnInit {
@@ -95,6 +96,7 @@ export class AdminDashboardComponent implements OnInit {
   private readonly cloudinary = inject(CloudinaryService);
   private readonly inventoryCsv = inject(InventoryCsvService);
   readonly section = signal<AdminSection>('overview');
+  readonly sidebarOpen = signal(false);
   readonly sectionTitle = computed(
     () =>
       ({
@@ -327,6 +329,7 @@ export class AdminDashboardComponent implements OnInit {
 
   selectSection(section: AdminSection): void {
     this.section.set(section);
+    this.sidebarOpen.set(false);
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: section === 'overview' ? {} : { section },

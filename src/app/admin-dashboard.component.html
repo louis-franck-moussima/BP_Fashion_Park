@@ -1,5 +1,9 @@
 <main class="admin-shell">
-  <aside class="admin-sidebar">
+  @if (sidebarOpen()) {
+    <button class="admin-sidebar-backdrop" type="button" aria-label="Close navigation" (click)="sidebarOpen.set(false)"></button>
+  }
+  <aside class="admin-sidebar" [class.open]="sidebarOpen()">
+    <button class="admin-sidebar-close" type="button" aria-label="Close navigation" (click)="sidebarOpen.set(false)">×</button>
     <a routerLink="/" class="admin-brand"
       ><span>BP</span><small>FASHION PARK</small></a
     >
@@ -49,6 +53,9 @@
   </aside>
   <section class="admin-content">
     <header class="admin-topbar">
+      <button class="admin-menu-toggle" type="button" aria-label="Open admin navigation" [attr.aria-expanded]="sidebarOpen()" (click)="sidebarOpen.set(true)">
+        <span></span><span></span><span></span>
+      </button>
       <div>
         <p>BP Fashion Park</p>
         <h1>{{ sectionTitle() }}</h1>
