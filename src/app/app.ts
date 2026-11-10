@@ -581,7 +581,7 @@ export class App implements OnInit, OnDestroy {
     const product = this.store.find(id);
     this.router.navigateByUrl(
       product
-        ? this.categoryStore.productUrl(product.category, product.id)
+        ? this.categoryStore.productUrl(product.category, product.id, product.name)
         : `/product/${encodeURIComponent(id)}`,
     );
   }

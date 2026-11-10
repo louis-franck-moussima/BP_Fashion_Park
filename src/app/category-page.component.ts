@@ -104,7 +104,7 @@ export class CategoryPageComponent implements OnInit {
     const product = this.productStore.findPublic(id);
     if (product)
       this.router.navigateByUrl(
-        this.categoryStore.productUrl(product.category, product.id),
+        this.categoryStore.productUrl(product.category, product.id, product.name),
       );
   }
 

@@ -46,8 +46,9 @@ type AdminSection =
   | 'overview'
   | 'products'
   | 'inventory'
-  | 'categories'
-  | 'subcategories'
+  | 'departments'
+  | 'groups'
+  | 'types'
   | 'requests'
   | 'activity'
   | 'settings';
@@ -103,8 +104,9 @@ export class AdminDashboardComponent implements OnInit {
         overview: 'Dashboard',
         products: 'Products',
         inventory: 'Inventory',
-        categories: 'Categories',
-        subcategories: 'Subcategories',
+        departments: 'Departments',
+        groups: 'Product groups',
+        types: 'Product types',
         requests: 'Customer requests',
         activity: 'Activity history',
         settings: 'Store settings',
@@ -295,6 +297,12 @@ export class AdminDashboardComponent implements OnInit {
       this.categoryStore.categories().filter((category) => category.parentCategoryId)
         .length,
   );
+  readonly productGroupCount = computed(() =>
+    this.categoryStore.categories().filter(category => this.categoryStore.path(category.id).length === 2).length,
+  );
+  readonly productTypeCount = computed(() =>
+    this.categoryStore.categories().filter(category => this.categoryStore.path(category.id).length === 3).length,
+  );
   readonly availableCategoryParents = computed(() => {
     const editingId = this.editingCategoryId();
     if (!editingId) return this.allCategories();
@@ -321,7 +329,7 @@ export class AdminDashboardComponent implements OnInit {
       const requested = params.get('section') as AdminSection | null;
       if (
         requested &&
-        ['overview', 'products', 'inventory', 'categories', 'subcategories', 'requests', 'activity', 'settings'].includes(requested)
+        ['overview', 'products', 'inventory', 'departments', 'groups', 'types', 'requests', 'activity', 'settings'].includes(requested)
       )
         this.section.set(requested);
     });
@@ -372,7 +380,8 @@ export class AdminDashboardComponent implements OnInit {
 
   openCategoryResult(category: Category): void {
     this.searchPanelOpen.set(false);
-    this.selectSection(category.parentCategoryId ? 'subcategories' : 'categories');
+    const depth = this.categoryStore.path(category.id).length;
+    this.selectSection(depth === 1 ? 'departments' : depth === 2 ? 'groups' : 'types');
   }
 
   clearAdminSearch(): void {
@@ -1512,7 +1521,7 @@ export class AdminDashboardComponent implements OnInit {
     if (
       typeof window !== 'undefined' &&
       !window.confirm(
-        `Delete ${category.name} and all of its empty subcategories?`,
+        `Delete department ${category.name} and all of its empty groups and product types?`,
       )
     )
       return;

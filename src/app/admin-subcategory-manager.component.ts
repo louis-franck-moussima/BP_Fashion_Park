@@ -15,6 +15,7 @@ import { AdminActivityService } from './admin-activity.service';
 })
 export class AdminSubcategoryManagerComponent {
   readonly searchQuery = input('');
+  readonly mode = input<'group' | 'type'>('group');
   readonly categoryStore = inject(CategoryStore);
   private readonly productStore = inject(ProductStore);
   private readonly activity = inject(AdminActivityService);
@@ -25,12 +26,14 @@ export class AdminSubcategoryManagerComponent {
   readonly saving = signal(false);
 
   readonly roots = this.categoryStore.roots;
+  readonly itemLabel = computed(() => this.mode() === 'group' ? 'Product group' : 'Product type');
+  readonly parentLabel = computed(() => this.mode() === 'group' ? 'Department' : 'Product group');
   readonly subcategories = computed(() => {
     const branch = this.selectedBranch();
     const query = this.searchQuery().trim().toLowerCase();
     return this.categoryStore
       .categories()
-      .filter((category) => category.parentCategoryId)
+      .filter((category) => this.categoryStore.path(category.id).length === (this.mode() === 'group' ? 2 : 3))
       .filter(
         (category) =>
           branch === 'all' ||
@@ -49,6 +52,7 @@ export class AdminSubcategoryManagerComponent {
     const editingId = this.editingId();
     return this.categoryStore
       .categories()
+      .filter(category => this.categoryStore.path(category.id).length === (this.mode() === 'group' ? 1 : 2))
       .filter(
         (category) =>
           category.id !== editingId &&
@@ -93,14 +97,14 @@ export class AdminSubcategoryManagerComponent {
       void this.activity.record({
         type: 'category_changed', entityType: 'category', entityId: category.id,
         title: `${existing ? 'Edited' : 'Created'} ${category.name}`,
-        description: `Subcategory saved in ${this.categoryStore.pathLabel(category.id)}.`,
+        description: `${this.itemLabel()} saved in ${this.categoryStore.pathLabel(category.id)}.`,
       }).catch(() => this.error.set('Subcategory saved, but activity history could not be updated.'));
       form.reset();
       this.editingId.set(null);
-      this.notice.set(`Subcategory “${category.name}” saved.`);
+      this.notice.set(`${this.itemLabel()} “${category.name}” saved.`);
     } catch (error) {
       this.error.set(
-        error instanceof Error ? error.message : 'Could not save subcategory.',
+        error instanceof Error ? error.message : `Could not save ${this.itemLabel().toLowerCase()}.`,
       );
     } finally {
       this.saving.set(false);
@@ -135,7 +139,7 @@ export class AdminSubcategoryManagerComponent {
       void this.activity.record({
         type: 'category_changed', entityType: 'category', entityId: category.id,
         title: `${category.name} ${category.active ? 'hidden' : 'shown'}`,
-        description: 'Subcategory storefront visibility changed.',
+        description: `${this.itemLabel()} storefront visibility changed.`,
       }).catch(() => this.error.set('Visibility changed, but activity history could not be updated.'));
       this.notice.set(
         `${category.name} is now ${category.active ? 'hidden' : 'visible'}.`,
@@ -151,19 +155,19 @@ export class AdminSubcategoryManagerComponent {
       ...this.categoryStore.descendants(category.id).map((item) => item.id),
     ]);
     if (this.productStore.products().some((product) => branchIds.has(product.category))) {
-      this.error.set('Move products out of this subcategory branch before deleting it.');
+      this.error.set(`Move products out of this ${this.itemLabel().toLowerCase()} before deleting it.`);
       return;
     }
     if (
       typeof window !== 'undefined' &&
-      !window.confirm(`Delete ${category.name} and its empty child subcategories?`)
+      !window.confirm(`Delete ${category.name}${this.mode() === 'group' ? ' and its empty product types' : ''}?`)
     )
       return;
     try {
       await this.categoryStore.remove(category.id);
       if (this.editingId() === category.id)
         this.editingId.set(null);
-      this.notice.set(`Subcategory “${category.name}” deleted.`);
+      this.notice.set(`${this.itemLabel()} “${category.name}” deleted.`);
     } catch (error) {
       this.error.set(error instanceof Error ? error.message : 'Delete failed.');
     }

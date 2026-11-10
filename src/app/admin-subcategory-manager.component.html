@@ -2,8 +2,8 @@
   <div class="subcategory-layout">
     <form #subcategoryForm class="subcategory-form" (submit)="save($event)">
       <div class="form-heading">
-        <span>{{ editingId() ? "Edit subcategory" : "New subcategory" }}</span>
-        <h2>{{ editingId() ? "Update its details" : "Place it under a category" }}</h2>
+        <span>{{ editingId() ? "Edit " + itemLabel().toLowerCase() : "New " + itemLabel().toLowerCase() }}</span>
+        <h2>{{ editingId() ? "Update its details" : "Place it under a " + parentLabel().toLowerCase() }}</h2>
       </div>
       <label>Parent
         <select name="parentCategoryId" required>
@@ -12,11 +12,11 @@
             <option [value]="category.id">{{ categoryStore.pathLabel(category.id) }}</option>
           }
         </select>
-        <small>You can select a category or another subcategory.</small>
+        <small>Select the {{ parentLabel().toLowerCase() }} that owns this {{ itemLabel().toLowerCase() }}.</small>
       </label>
       <label>Name<input name="name" required minlength="2" maxlength="60" placeholder="e.g. Training shoes" /></label>
       <label>Description<input name="description" maxlength="240" placeholder="Short storefront description" /></label>
-      <button type="submit" [disabled]="saving()">{{ saving() ? "Saving…" : editingId() ? "Save changes" : "Add subcategory" }}</button>
+      <button type="submit" [disabled]="saving()">{{ saving() ? "Saving…" : editingId() ? "Save changes" : "Add " + itemLabel().toLowerCase() }}</button>
       @if (editingId()) {
         <button type="button" class="secondary" (click)="cancel(subcategoryForm)">Cancel editing</button>
       }
@@ -26,17 +26,17 @@
 
     <div class="subcategory-list-panel">
       <header>
-        <div><span>Subcategory directory</span><h2>Manage independently</h2></div>
+        <div><span>{{ itemLabel() }} directory</span><h2>Manage {{ itemLabel().toLowerCase() }}s</h2></div>
         <label>Show branch
           <select [value]="selectedBranch()" (change)="selectedBranch.set($any($event.target).value)">
-            <option value="all">All categories</option>
+            <option value="all">All departments</option>
             @for (root of roots(); track root.id) { <option [value]="root.id">{{ root.name }}</option> }
           </select>
         </label>
       </header>
       <div class="subcategory-list">
         <div class="subcategory-list-head" aria-hidden="true">
-          <span>Located under</span><span>Subcategory</span><span>Products</span><span>Actions</span>
+          <span>Located under</span><span>{{ itemLabel() }}</span><span>Products</span><span>Actions</span>
         </div>
         @for (category of subcategories(); track category.id) {
           <article [class.inactive]="!category.active">
@@ -52,7 +52,7 @@
             </div>
           </article>
         } @empty {
-          <div class="empty-subcategories"><strong>No subcategories in this branch</strong><p>Create one with the form.</p></div>
+          <div class="empty-subcategories"><strong>No {{ itemLabel().toLowerCase() }}s in this branch</strong><p>Create one with the form.</p></div>
         }
       </div>
     </div>

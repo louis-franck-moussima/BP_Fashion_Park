@@ -22,11 +22,14 @@
         <button [class.active]="section() === 'inventory'" (click)="selectSection('inventory')">
           <span>≣</span><b>Inventory</b><small>{{ lowStock().length + outOfStock().length }}</small>
         </button>
-        <button [class.active]="section() === 'categories'" (click)="selectSection('categories')">
-          <span>C</span><b>Categories</b><small>{{ mainCategories().length }}</small>
+        <button [class.active]="section() === 'departments'" (click)="selectSection('departments')">
+          <span>D</span><b>Departments</b><small>{{ mainCategories().length }}</small>
         </button>
-        <button class="nested-nav" [class.active]="section() === 'subcategories'" (click)="selectSection('subcategories')">
-          <span>S</span><b>Subcategories</b><small>{{ subcategoryCount() }}</small>
+        <button class="nested-nav" [class.active]="section() === 'groups'" (click)="selectSection('groups')">
+          <span>G</span><b>Product groups</b><small>{{ productGroupCount() }}</small>
+        </button>
+        <button class="nested-nav" [class.active]="section() === 'types'" (click)="selectSection('types')">
+          <span>T</span><b>Product types</b><small>{{ productTypeCount() }}</small>
         </button>
       </div>
       <div class="sidebar-nav-group">
@@ -62,7 +65,7 @@
       </div>
       <label class="admin-global-search">
         <span class="sr-only">Search the admin catalog</span><i aria-hidden="true">⌕</i>
-        <input type="search" placeholder="Search products, SKU, stock, colors, categories…"
+        <input type="search" placeholder="Search products, SKU, stock, departments, groups…"
           [value]="adminSearch()" (focus)="searchPanelOpen.set(true)"
           (input)="adminSearch.set($any($event.target).value); searchPanelOpen.set(true)"
           (keydown.escape)="searchPanelOpen.set(false)" />
@@ -87,10 +90,10 @@
               <button class="admin-search-result" (click)="openProductResult(product)"><span><strong>{{ product.name }}</strong><small>{{ product.sku || categoryName(product.category) }}</small></span><b [class.out]="stockOf(product) === 0">{{ stockOf(product) === 0 ? "Out of stock" : stockOf(product) + " units" }}</b></button>
             } @empty { <p class="admin-search-empty">No matching products</p> }
           </div>
-          <div><h2>Categories & subcategories</h2>
+          <div><h2>Departments, groups & types</h2>
             @for (category of searchedCategories().slice(0, 8); track category.id) {
               <button class="admin-search-result" (click)="openCategoryResult(category)"><span><strong>{{ category.name }}</strong><small>{{ categoryStore.pathLabel(category.id) }}</small></span><b>{{ category.parentCategoryId ? "Subcategory" : "Category" }}</b></button>
-            } @empty { <p class="admin-search-empty">No matching categories</p> }
+            } @empty { <p class="admin-search-empty">No matching catalog records</p> }
           </div>
         </div>
       </section>
@@ -110,7 +113,7 @@
         <div>
           <strong>Loading catalog data</strong>
           <p>
-            Retrieving products, categories and current stock from Firebase.
+            Retrieving products, catalog structure and current stock from Firebase.
           </p>
         </div>
       </div>
@@ -151,7 +154,7 @@
           <strong>Import the prepared shop structure</strong>
           <p>
             Add the Women, Men, Children, Unisex, Beauty & Hair, Accessories and
-            Travel categories with their subcategories. You can edit, hide,
+            Travel departments with their groups and product types. You can edit, hide,
             reorder or delete them afterward.
           </p>
         </div>
@@ -160,7 +163,7 @@
           [disabled]="!auth.user() || importingStarterCategories()"
         >
           {{
-            importingStarterCategories() ? "Importing…" : "Import categories"
+            importingStarterCategories() ? "Importing…" : "Import catalog structure"
           }}
         </button>
       </div>
@@ -403,12 +406,12 @@
       </section>
     }
 
-    @if (section() === "categories") {
+    @if (section() === "departments") {
       <section class="admin-panel-block">
         <div class="block-heading">
           <div>
             <span>Catalog structure</span>
-            <h2>Category hierarchy</h2>
+            <h2>Departments</h2>
           </div>
           @if (auth.user()) {
             <button type="button" class="category-structure-action" (click)="simplifyCategoryStructure()" [disabled]="categoryMigrationBusy()">
@@ -464,7 +467,7 @@
               /></label>
             </div>
             <button type="submit" [disabled]="categoryImageUploading()">
-              {{ editingCategoryId() ? "Save category" : "Add main category" }}
+              {{ editingCategoryId() ? "Save department" : "Add department" }}
             </button>
             @if (editingCategoryId()) {
               <button
@@ -540,8 +543,11 @@
         </div>
       </section>
     }
-    @if (section() === "subcategories") {
-      <app-admin-subcategory-manager [searchQuery]="adminSearch()" />
+    @if (section() === "groups") {
+      <app-admin-subcategory-manager mode="group" [searchQuery]="adminSearch()" />
+    }
+    @if (section() === "types") {
+      <app-admin-subcategory-manager mode="type" [searchQuery]="adminSearch()" />
     }
     @if (section() === "requests") {
       <section class="admin-panel-block request-admin-panel">

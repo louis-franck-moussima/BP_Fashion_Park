@@ -1,3 +1,4 @@
+import { DOCUMENT } from '@angular/common';
 import { Injectable, inject } from '@angular/core';
 import { Meta, Title } from '@angular/platform-browser';
 import { Category } from './category.model';
@@ -9,6 +10,7 @@ export class SeoService {
   private readonly title = inject(Title);
   private readonly meta = inject(Meta);
   private readonly storeSettings = inject(StoreSettingsService);
+  private readonly document = inject(DOCUMENT);
   private readonly brand = 'BP Fashion Park';
 
   setHome(): void {
@@ -35,7 +37,7 @@ export class SeoService {
     this.apply(`Shop ${pathLabel} | ${this.brand}`, description, 'website');
   }
 
-  setProduct(product: Product, categoryName: string): void {
+  setProduct(product: Product, categoryName: string, canonicalPath?: string): void {
     const availability =
       totalStock(product) > 0 ? 'Available now' : 'Currently out of stock';
     const description = `${product.description} ${this.storeSettings.priceLabel(product)}. ${availability} in ${categoryName}.`;
@@ -47,6 +49,8 @@ export class SeoService {
       description,
       'product',
       image,
+      true,
+      canonicalPath,
     );
   }
 
@@ -66,6 +70,7 @@ export class SeoService {
     type: string,
     image?: string,
     index = true,
+    canonicalPath?: string,
   ): void {
     const safeTitle = this.clamp(title, 65);
     const safeDescription = this.clamp(
@@ -85,6 +90,19 @@ export class SeoService {
       content: safeDescription,
     });
     this.meta.updateTag({ property: 'og:type', content: type });
+    const canonicalUrl = canonicalPath
+      ? new URL(canonicalPath, this.document.location?.origin || 'https://bp-fashion-park-4c84c.web.app').href
+      : this.document.location?.href;
+    if (canonicalUrl) {
+      this.meta.updateTag({ property: 'og:url', content: canonicalUrl });
+      let canonical = this.document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+      if (!canonical) {
+        canonical = this.document.createElement('link');
+        canonical.rel = 'canonical';
+        this.document.head.appendChild(canonical);
+      }
+      canonical.href = canonicalUrl;
+    }
     this.meta.updateTag({
       name: 'twitter:card',
       content: image ? 'summary_large_image' : 'summary',

@@ -131,8 +131,12 @@ export class CategoryStore {
     return result;
   }
   url(categoryId: string): string { return '/' + this.path(categoryId).map(category => category.slug).join('/'); }
-  productUrl(categoryId: string, productId: string): string {
-    return `${this.url(categoryId)}/product/${encodeURIComponent(productId)}`;
+  productUrl(categoryId: string, productId: string, productName?: string): string {
+    const slug = productName
+      ? productName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+      : '';
+    const routeId = slug ? `${slug}--${productId}` : productId;
+    return `${this.url(categoryId)}/product/${encodeURIComponent(routeId)}`;
   }
   pathLabel(categoryId: string): string { return this.path(categoryId).map(category => category.name).join(' / '); }
   findByPath(segments: string[]): Category | undefined {

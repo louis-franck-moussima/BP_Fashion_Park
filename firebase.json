@@ -5,6 +5,7 @@
   },
   "hosting": {
     "public": "dist/bp_fashion_park/browser",
+    "cleanUrls": true,
     "ignore": [
       "firebase.json",
       "**/.*",

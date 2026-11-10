@@ -6,7 +6,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Product, ProductColor, totalStock } from './product.model';
 import { ProductStore } from './product-store.service';
 import { CategoryStore } from './category-store.service';
@@ -25,6 +25,7 @@ import { StoreSettingsService } from './store-settings.service';
 })
 export class ProductDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   readonly store = inject(ProductStore);
   readonly categoryStore = inject(CategoryStore);
   readonly cart = inject(CartService);
@@ -36,7 +37,8 @@ export class ProductDetailComponent implements OnInit {
   readonly catalogError = computed(
     () => this.store.loadError() || this.categoryStore.loadError(),
   );
-  readonly productId = signal(this.route.snapshot.paramMap.get('id') ?? '');
+  readonly routeProductId = signal(this.route.snapshot.paramMap.get('id') ?? '');
+  readonly productId = computed(() => this.decodeProductId(this.routeProductId()));
   readonly selectedImage = signal(0);
   readonly selectedColor = signal<ProductColor | null>(null);
   readonly selectedSize = signal<string | null>(null);
@@ -112,19 +114,23 @@ export class ProductDetailComponent implements OnInit {
 
   constructor() {
     this.route.paramMap.subscribe((params) => {
-      this.productId.set(params.get('id') ?? '');
+      this.routeProductId.set(params.get('id') ?? '');
       this.selectedImage.set(0);
       this.selectInitialColor();
       this.selectInitialSize();
     });
     effect(() => {
       const product = this.product();
-      if (product)
+      if (product) {
+        const canonicalPath = this.categoryStore.productUrl(product.category, product.id, product.name);
+        if (this.router.url.split(/[?#]/)[0] !== canonicalPath)
+          void this.router.navigateByUrl(canonicalPath, { replaceUrl: true });
         this.seo.setProduct(
           product,
           this.categoryStore.pathLabel(product.category),
+          canonicalPath,
         );
-      else if (!this.catalogLoading() && !this.catalogError())
+      } else if (!this.catalogLoading() && !this.catalogError())
         this.seo.setNotFound('Product');
     });
   }
@@ -192,7 +198,8 @@ export class ProductDetailComponent implements OnInit {
     return this.categoryStore.name(id);
   }
   productUrl(categoryId: string, productId: string): string {
-    return this.categoryStore.productUrl(categoryId, productId);
+    const product = this.store.findPublic(productId);
+    return this.categoryStore.productUrl(categoryId, productId, product?.name);
   }
   stockOf(id: string): number {
     const product = this.store.findPublic(id);
@@ -241,6 +248,10 @@ export class ProductDetailComponent implements OnInit {
         product?.colors[0] ??
         null,
     );
+  }
+  private decodeProductId(routeId: string): string {
+    const separator = routeId.lastIndexOf('--');
+    return separator >= 0 ? routeId.slice(separator + 2) : routeId;
   }
   private selectInitialSize(): void {
     const product = this.product();
