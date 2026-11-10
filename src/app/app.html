@@ -139,6 +139,7 @@
       ><button
         class="bag-button"
         aria-label="Open request bag"
+        [attr.title]="cart.count() + ' item(s) in request bag'"
         [attr.aria-expanded]="cart.open()"
         (click)="openCart()"
       >
@@ -207,11 +208,7 @@
             ><span class="search-result-copy"
               ><small>{{ categoryName(product.category) }}</small
               ><strong>{{ product.name }}</strong
-              ><em [class.out]="stockOf(product) === 0">{{
-                stockOf(product) === 0
-                  ? "Out of stock"
-                  : stockOf(product) + " available"
-              }}</em></span
+              ><em [class.out]="stockOf(product) === 0">{{ stockLabel(product) }}</em></span
             ><span class="search-result-price">{{ priceLabel(product) }}</span>
           </button>
         } @empty {
@@ -308,14 +305,28 @@
                 maxlength="80"
                 autocomplete="name" /></label
             ><label
-              >Phone<input
+              >Phone<div class="request-phone-control">
+                <select
+                  aria-label="Phone country"
+                  [value]="requestPhoneCountry()"
+                  (change)="requestPhoneCountry.set($any($event.target).value)"
+                  [disabled]="phoneCountriesLoading()"
+                >
+                  @if (!phoneCountries().length) { <option value="CM">🇨🇲 +237</option> }
+                  @for (country of phoneCountries(); track country.code) {
+                    <option [value]="country.code" [attr.title]="country.name">{{ country.flag }} {{ country.callingCode }}</option>
+                  }
+                </select>
+                <input
                 name="phone"
                 type="tel"
                 required
                 minlength="5"
                 maxlength="30"
                 autocomplete="tel"
-            /></label>
+                inputmode="tel"
+                placeholder="6 70 00 00 00"
+            /></div><small>Select the country, then enter a local or international number.</small></label>
           </div>
           <label
             >City<input
@@ -355,12 +366,21 @@
           <span>✓</span><small>Request saved</small
           ><strong>{{ request.reference }}</strong>
           <p>Keep this reference when speaking with BP Fashion Park.</p>
+          <button
+            type="button"
+            class="request-share-pdf"
+            (click)="shareRequestPdf(request)"
+            [disabled]="requestPdfBusy()"
+          >{{ requestPdfBusy() ? "Preparing PDF…" : "Share reservation PDF" }}</button>
+          <button type="button" class="request-download-pdf" (click)="downloadRequestPdf(request)" [disabled]="requestPdfBusy()">Download PDF</button>
+          @if (requestPdfError()) { <p class="request-error">{{ requestPdfError() }}</p> }
+          <button type="button" class="request-new" (click)="startNewRequest()">Start a new request</button>
           <a
             [href]="requestWhatsappUrl()"
             target="_blank"
             rel="noopener"
             (click)="finishCustomerRequest()"
-            >Continue to WhatsApp</a
+            >Send text on WhatsApp</a
           >
         </section>
       }
@@ -450,6 +470,7 @@
       ) {
         <article
           class="category-card"
+          [class.has-photo]="!!categoryShowcaseImage(category.id)"
           [class.women]="i === 0"
           [class.men]="i === 1"
           [class.accessories]="i === 2"
@@ -458,9 +479,9 @@
           tabindex="0"
         >
           <div class="category-visual">
-            @if (category.imageUrl) {
+            @if (categoryShowcaseImage(category.id); as showcaseImage) {
               <img
-                [src]="category.imageUrl"
+                [src]="showcaseImage"
                 [alt]="category.name"
                 [style.object-position]="category.imagePosition || 'center'"
               />
@@ -601,11 +622,7 @@
                       <span
                         class="availability"
                         [class.sold-out]="stockOf(product) === 0"
-                        >{{
-                          stockOf(product) === 0
-                            ? "Out of stock"
-                            : stockOf(product) + " available"
-                        }}</span
+                        >{{ stockLabel(product) }}</span
                       >
                       @if (product.images.length) {
                         <img

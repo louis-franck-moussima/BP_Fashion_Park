@@ -104,6 +104,7 @@ export class ProductRepository {
     delta: number,
     reason: StockMovementReason,
     colorName?: string,
+    sizeName?: string,
   ): Promise<StockMovement> {
     if (!this.db)
       throw new Error('Firebase must be connected to adjust stock.');
@@ -121,7 +122,22 @@ export class ProductRepository {
         throw new Error('Stock adjustment must be a non-zero whole number.');
       if (newStock < 0) throw new Error('Stock cannot be reduced below zero.');
       let colors = product.colors;
-      if (colorName) {
+      let variants = product.variants ?? [];
+      if (variants.length) {
+        if (!colorName || !sizeName)
+          throw new Error('Choose both a color and size for this stock adjustment.');
+        const selected = variants.find(
+          (variant) => variant.color === colorName && variant.size === sizeName,
+        );
+        if (!selected) throw new Error('The selected product variant no longer exists.');
+        if (selected.stock + delta < 0)
+          throw new Error(`${colorName} / ${sizeName} stock cannot be reduced below zero.`);
+        variants = variants.map((variant) =>
+          variant.color === colorName && variant.size === sizeName
+            ? { ...variant, stock: variant.stock + delta }
+            : variant,
+        );
+      } else if (colorName) {
         if (colors.some((color) => color.stock === undefined))
           throw new Error('Allocate the existing stock by color in the product editor first.');
         const selected = colors.find(
@@ -144,9 +160,13 @@ export class ProductRepository {
         newStock,
         reason,
         ...(colorName ? { color: colorName } : {}),
+        ...(sizeName ? { size: sizeName } : {}),
         createdAt: Date.now(),
       };
-      transaction.update(productRef, colorName ? { colors } : { stock: newStock });
+      transaction.update(
+        productRef,
+        variants.length ? { variants } : colorName ? { colors } : { stock: newStock },
+      );
       transaction.set(movementRef, movement);
       return movement;
     });

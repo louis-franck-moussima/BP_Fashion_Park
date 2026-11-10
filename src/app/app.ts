@@ -3,6 +3,7 @@ import {
   OnDestroy,
   OnInit,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -24,6 +25,8 @@ import { SeoService } from './seo.service';
 import { CustomerRequestStore } from './customer-request-store.service';
 import { CustomerRequest } from './customer-request.model';
 import { StoreSettingsService } from './store-settings.service';
+import type { CountryCode } from 'libphonenumber-js';
+import type { PhoneCountryOption } from './phone-countries';
 
 type CategoryFilter = 'All' | ProductCategory;
 type SortOption = 'featured' | 'price-low' | 'price-high' | 'newest';
@@ -33,7 +36,7 @@ type Language = 'en' | 'fr';
   selector: 'app-root',
   imports: [RouterOutlet],
   templateUrl: './app.html',
-  styleUrls: ['./app.css', './app-catalog-nav.css'],
+  styleUrls: ['./app.css', './app-catalog-nav.css', './app-category-photography.css'],
 })
 export class App implements OnInit, OnDestroy {
   private heroTimer?: ReturnType<typeof setInterval>;
@@ -62,6 +65,11 @@ export class App implements OnInit, OnDestroy {
   readonly categoryError = signal('');
   readonly requestSubmitting = signal(false);
   readonly requestError = signal('');
+  readonly requestPdfBusy = signal(false);
+  readonly requestPdfError = signal('');
+  readonly requestPhoneCountry = signal<CountryCode>('CM');
+  readonly phoneCountries = signal<PhoneCountryOption[]>([]);
+  readonly phoneCountriesLoading = signal(false);
   readonly submittedRequest = signal<CustomerRequest | null>(null);
   readonly requestWhatsappUrl = computed(() => {
     const request = this.submittedRequest();
@@ -76,6 +84,11 @@ export class App implements OnInit, OnDestroy {
   readonly isAuthPage = signal(false);
   readonly categories = computed(() => this.categoryStore.active());
   readonly rootCategories = this.categoryStore.roots;
+  readonly defaultCategoryImages: Record<string, string> = {
+    women: '/categories/women-editorial.jpg',
+    men: '/categories/men-editorial.jpg',
+    children: '/categories/children-editorial.jpg',
+  };
   readonly mobileMenuCurrentCategory = computed(() => {
     const path = this.mobileMenuPath();
     return path.length
@@ -105,6 +118,13 @@ export class App implements OnInit, OnDestroy {
   );
   readonly isCloudinaryLive = this.cloudinary.configured;
   readonly stockOf = totalStock;
+  stockLabel(product: Product): string {
+    const stock = totalStock(product);
+    if (stock === 0) return 'Out of stock';
+    if (stock <= (product.lowStockThreshold ?? 3) || product.limitedQuantity)
+      return 'Limited quantity';
+    return 'Available';
+  }
   readonly whatsappContactUrl = computed(() =>
     this.storeSettings.whatsappUrl('Hello BP Fashion Park'),
   );
@@ -207,6 +227,14 @@ export class App implements OnInit, OnDestroy {
       .filter((section) => section.products.length),
   );
 
+  categoryShowcaseImage(categoryId: string): string {
+    return (
+      this.categoryStore.find(categoryId)?.imageUrl ??
+      this.defaultCategoryImages[categoryId] ??
+      ''
+    );
+  }
+
   readonly searchSuggestions = computed(() => {
     const query = this.searchQuery().trim().toLowerCase();
     const products = query
@@ -225,6 +253,10 @@ export class App implements OnInit, OnDestroy {
   });
 
   constructor() {
+    effect(() => {
+      if (this.submittedRequest() && this.cart.items().length)
+        this.submittedRequest.set(null);
+    });
     if (typeof window !== 'undefined') {
       const savedLanguage = window.localStorage.getItem('bp-fashion-language');
       if (savedLanguage === 'en' || savedLanguage === 'fr')
@@ -310,6 +342,7 @@ export class App implements OnInit, OnDestroy {
     this.closeMobileMenu();
     this.closeSearch();
     this.cart.open.set(true);
+    void this.loadPhoneCountries();
   }
   async submitCustomerRequest(event: Event): Promise<void> {
     event.preventDefault();
@@ -323,19 +356,21 @@ export class App implements OnInit, OnDestroy {
       size: item.size,
       quantity: item.quantity,
       priceLabel: item.priceLabel,
+      imageUrl: item.imageUrl,
     }));
     this.requestSubmitting.set(true);
     this.requestError.set('');
     try {
-      this.submittedRequest.set(
-        await this.customerRequests.create(
+      const request = await this.customerRequests.create(
           String(data.get('name') || ''),
           String(data.get('phone') || ''),
+          this.requestPhoneCountry(),
           String(data.get('city') || ''),
           String(data.get('message') || ''),
           items,
-        ),
-      );
+        );
+      this.cart.clear();
+      this.submittedRequest.set(request);
     } catch (error) {
       this.requestError.set(
         error instanceof Error
@@ -346,11 +381,71 @@ export class App implements OnInit, OnDestroy {
       this.requestSubmitting.set(false);
     }
   }
+  async loadPhoneCountries(): Promise<void> {
+    if (this.phoneCountries().length || this.phoneCountriesLoading()) return;
+    this.phoneCountriesLoading.set(true);
+    try {
+      const { createPhoneCountryOptions } = await import('./phone-countries');
+      this.phoneCountries.set(await createPhoneCountryOptions());
+    } finally {
+      this.phoneCountriesLoading.set(false);
+    }
+  }
   finishCustomerRequest(): void {
     this.cart.clear();
     this.cart.open.set(false);
     this.submittedRequest.set(null);
     this.requestError.set('');
+  }
+  startNewRequest(): void {
+    this.cart.clear();
+    this.submittedRequest.set(null);
+    this.requestError.set('');
+    this.requestPdfError.set('');
+  }
+  async downloadRequestPdf(request: CustomerRequest): Promise<void> {
+    this.requestPdfBusy.set(true);
+    this.requestPdfError.set('');
+    try {
+      const { createRequestPdf } = await import('./request-pdf');
+      this.downloadFile(await createRequestPdf(request));
+    } catch {
+      this.requestPdfError.set('The reservation PDF could not be created.');
+    } finally {
+      this.requestPdfBusy.set(false);
+    }
+  }
+  async shareRequestPdf(request: CustomerRequest): Promise<void> {
+    this.requestPdfBusy.set(true);
+    this.requestPdfError.set('');
+    try {
+      const { createRequestPdf } = await import('./request-pdf');
+      const file = await createRequestPdf(request);
+      const shareData: ShareData = {
+        files: [file],
+        title: `BP Fashion Park · ${request.reference}`,
+        text: `Availability request ${request.reference}`,
+      };
+      if (navigator.share && (!navigator.canShare || navigator.canShare(shareData)))
+        await navigator.share(shareData);
+      else {
+        this.downloadFile(file);
+        window.open(this.requestWhatsappUrl(), '_blank', 'noopener');
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      this.requestPdfError.set('The reservation PDF could not be shared.');
+    } finally {
+      this.requestPdfBusy.set(false);
+    }
+  }
+  private downloadFile(file: File): void {
+    const url = URL.createObjectURL(file);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = file.name;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   closeSearch(): void {
     this.searchOpen.set(false);

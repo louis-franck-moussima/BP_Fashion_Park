@@ -46,21 +46,20 @@ export class ProductDetailComponent implements OnInit {
       ? product
       : undefined;
   });
-  readonly visibleImages = computed(() => {
-    const product = this.product();
-    if (!product) return [];
-    const color = this.selectedColor()?.name.toLowerCase();
-    if (!color) return product.images;
-    const matching = product.images.filter(
-      (image) => image.color?.toLowerCase() === color,
-    );
-    return matching.length ? matching : product.images;
-  });
+  readonly visibleImages = computed(() => this.product()?.images ?? []);
   readonly totalStock = computed(() =>
     this.product() ? totalStock(this.product()!) : 0,
   );
   readonly selectedColorStock = computed(() => {
+    const product = this.product();
     const color = this.selectedColor();
+    const size = this.selectedSize();
+    if (product?.variants?.length && color && size)
+      return this.variantStock(color.name, size);
+    if (product?.variants?.length && color)
+      return product.variants
+        .filter((variant) => variant.color === color.name)
+        .reduce((sum, variant) => sum + variant.stock, 0);
     return color?.stock ?? this.totalStock();
   });
   priceLabel(product: Product): string {
@@ -142,10 +141,46 @@ export class ProductDetailComponent implements OnInit {
 
   selectColor(color: ProductColor): void {
     this.selectedColor.set(color);
-    this.selectedImage.set(0);
+    const imageIndex = this.product()?.images.findIndex(
+      (_, index) => this.imageColorAt(index)?.toLowerCase() === color.name.toLowerCase(),
+    ) ?? -1;
+    if (imageIndex >= 0) this.selectedImage.set(imageIndex);
+    const product = this.product();
+    if (product?.variants?.length)
+      this.selectedSize.set(
+        product.sizes?.find((size) => this.variantStock(color.name, size) > 0) ??
+          product.sizes?.[0] ??
+          null,
+      );
+  }
+  selectGalleryImage(index: number): void {
+    this.selectedImage.set(index);
+    const colorName = this.imageColorAt(index);
+    const color = this.product()?.colors.find(
+      (item) => item.name.toLowerCase() === colorName?.toLowerCase(),
+    );
+    if (color) {
+      this.selectedColor.set(color);
+      const product = this.product();
+      if (product?.variants?.length)
+        this.selectedSize.set(
+          product.sizes?.find((size) => this.variantStock(color.name, size) > 0) ??
+            product.sizes?.[0] ??
+            null,
+        );
+    }
+  }
+  imageColorAt(index: number): string | undefined {
+    const product = this.product();
+    if (!product) return undefined;
+    const explicit = product.images[index]?.color;
+    if (explicit) return explicit;
+    return product.images.length === product.colors.length
+      ? product.colors[index]?.name
+      : undefined;
   }
   selectSize(size: string): void {
-    this.selectedSize.set(size);
+    if (this.isSizeAvailable(size)) this.selectedSize.set(size);
   }
   addToBag(): void {
     const product = this.product();
@@ -163,6 +198,32 @@ export class ProductDetailComponent implements OnInit {
     const product = this.store.findPublic(id);
     return product ? totalStock(product) : 0;
   }
+  stockLabel(id: string): string {
+    const product = this.store.findPublic(id);
+    if (!product || totalStock(product) === 0) return 'Out of stock';
+    if (totalStock(product) <= (product.lowStockThreshold ?? 3) || product.limitedQuantity)
+      return 'Limited quantity';
+    return 'Available';
+  }
+  colorStock(colorName: string): number {
+    const product = this.product();
+    if (!product) return 0;
+    if (product.variants?.length)
+      return product.variants
+        .filter((variant) => variant.color === colorName)
+        .reduce((sum, variant) => sum + variant.stock, 0);
+    return product.colors.find((color) => color.name === colorName)?.stock ?? totalStock(product);
+  }
+  variantStock(colorName: string, size: string): number {
+    return this.product()?.variants?.find(
+      (variant) => variant.color === colorName && variant.size === size,
+    )?.stock ?? 0;
+  }
+  isSizeAvailable(size: string): boolean {
+    const product = this.product();
+    const color = this.selectedColor();
+    return !product?.variants?.length || !color || this.variantStock(color.name, size) > 0;
+  }
   recommendationReason(categoryId: string): string {
     const current = this.product();
     if (!current) return 'Selected for you';
@@ -176,13 +237,19 @@ export class ProductDetailComponent implements OnInit {
   private selectInitialColor(): void {
     const product = this.product();
     this.selectedColor.set(
-      product?.colors.find((color) => (color.stock ?? this.totalStock()) > 0) ??
+      product?.colors.find((color) => this.colorStock(color.name) > 0) ??
         product?.colors[0] ??
         null,
     );
   }
   private selectInitialSize(): void {
-    this.selectedSize.set(this.product()?.sizes?.[0] ?? null);
+    const product = this.product();
+    const color = this.selectedColor();
+    this.selectedSize.set(
+      product?.sizes?.find(
+        (size) => !product.variants?.length || !color || this.variantStock(color.name, size) > 0,
+      ) ?? product?.sizes?.[0] ?? null,
+    );
   }
 
   private rootCategory(categoryId: string): string {

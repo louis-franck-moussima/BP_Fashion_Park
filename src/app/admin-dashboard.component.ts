@@ -40,6 +40,7 @@ import {
 import { AdminActivityService } from './admin-activity.service';
 import { AdminActivityType, NewAdminActivity } from './admin-activity.model';
 import { FlatpickrDirective } from './flatpickr.directive';
+import { normalizePhoneNumber } from './phone-number';
 
 type AdminSection =
   | 'overview'
@@ -142,12 +143,20 @@ export class AdminDashboardComponent implements OnInit {
   readonly editorCategoryId = signal('');
   readonly editorColorOptions = signal<string[]>([]);
   readonly editorColorStocks = signal<Record<string, number | null>>({});
+  readonly editorSizeOptions = signal<string[]>([]);
+  readonly editorVariantStocks = signal<Record<string, number | null>>({});
   readonly editorVariantStockTotal = computed(() =>
-    Object.values(this.editorColorStocks()).reduce<number>(
+    Object.values(this.editorVariantStocks()).some((stock) => stock !== null)
+      ? Object.values(this.editorVariantStocks()).reduce<number>(
+          (total, stock) => total + (stock ?? 0), 0,
+        )
+      : Object.values(this.editorColorStocks()).reduce<number>(
       (total, stock) => total + (stock ?? 0), 0,
-    ),
+        ),
   );
   readonly editorDisplayedStock = computed(() => {
+    const variantStocks = Object.values(this.editorVariantStocks());
+    if (variantStocks.some((stock) => stock !== null)) return this.editorVariantStockTotal();
     const stocks = Object.values(this.editorColorStocks());
     if (stocks.some((stock) => stock !== null)) return this.editorVariantStockTotal();
     const existing = this.editingProductId()
@@ -384,22 +393,25 @@ export class AdminDashboardComponent implements OnInit {
     const form = event.target as HTMLFormElement;
     if (!form.reportValidity()) return;
     const data = new FormData(form);
-    const settings: StoreSettings = {
-      whatsappNumber: String(data.get('whatsappNumber') || '').trim(),
-      instagramUrl: String(data.get('instagramUrl') || '').trim(),
-      contactEmail: String(data.get('contactEmail') || '').trim(),
-      businessAddress: String(data.get('businessAddress') || '').trim(),
-      deliveryInformation: String(data.get('deliveryInformation') || '').trim(),
-      currency: String(data.get('currency') || 'EUR'),
-      defaultLanguage: String(
-        data.get('defaultLanguage') || 'en',
-      ) as StoreSettings['defaultLanguage'],
-      announcementText: String(data.get('announcementText') || '').trim(),
-      updatedAt: Date.now(),
-    };
     this.savingSettings.set(true);
     this.settingsMessage.set('');
     try {
+      const settings: StoreSettings = {
+        whatsappNumber: await normalizePhoneNumber(
+          String(data.get('whatsappNumber') || ''),
+          false,
+        ),
+        instagramUrl: String(data.get('instagramUrl') || '').trim(),
+        contactEmail: String(data.get('contactEmail') || '').trim(),
+        businessAddress: String(data.get('businessAddress') || '').trim(),
+        deliveryInformation: String(data.get('deliveryInformation') || '').trim(),
+        currency: String(data.get('currency') || 'EUR'),
+        defaultLanguage: String(
+          data.get('defaultLanguage') || 'en',
+        ) as StoreSettings['defaultLanguage'],
+        announcementText: String(data.get('announcementText') || '').trim(),
+        updatedAt: Date.now(),
+      };
       await this.storeSettings.save(settings);
       this.settingsMessage.set('Store settings saved successfully.');
       this.notify('Store settings saved successfully.');
@@ -440,6 +452,8 @@ export class AdminDashboardComponent implements OnInit {
     this.editorCategoryId.set(this.categoryStore.active()[0]?.id ?? '');
     this.editorColorOptions.set([]);
     this.editorColorStocks.set({});
+    this.editorSizeOptions.set([]);
+    this.editorVariantStocks.set({});
     this.imageUploadColor.set('');
     this.removedImages.set([]);
     this.uploadedThisSession.set([]);
@@ -456,6 +470,10 @@ export class AdminDashboardComponent implements OnInit {
     this.editorColorOptions.set(product.colors.map((color) => color.name));
     this.editorColorStocks.set(Object.fromEntries(
       product.colors.map((color) => [color.name, color.stock ?? null]),
+    ));
+    this.editorSizeOptions.set(product.sizes ?? []);
+    this.editorVariantStocks.set(Object.fromEntries(
+      (product.variants ?? []).map((variant) => [this.variantKey(variant.color, variant.size), variant.stock]),
     ));
     this.imageUploadColor.set('');
     this.removedImages.set([]);
@@ -474,6 +492,10 @@ export class AdminDashboardComponent implements OnInit {
     this.editorColorOptions.set(product.colors.map((color) => color.name));
     this.editorColorStocks.set(Object.fromEntries(
       product.colors.map((color) => [color.name, color.stock ?? 0]),
+    ));
+    this.editorSizeOptions.set(product.sizes ?? []);
+    this.editorVariantStocks.set(Object.fromEntries(
+      (product.variants ?? []).map((variant) => [this.variantKey(variant.color, variant.size), variant.stock]),
     ));
     this.imageUploadColor.set('');
     this.removedImages.set([]);
@@ -639,16 +661,18 @@ export class AdminDashboardComponent implements OnInit {
   ): Promise<void> {
     if (!this.auth.user() || this.stockActionId()) return;
     if (totalStock(product) + delta < 0) return;
-    const color = this.chooseStockColor(product);
-    if (product.colors.length && !color) return;
+    const selection = this.chooseStockVariant(product);
+    if (product.colors.length && !selection) return;
+    const color = selection?.color;
+    const size = selection?.size;
     this.stockActionId.set(product.id);
     this.inventoryError.set('');
     try {
-      await this.productStore.adjustStock(product.id, delta, reason, color);
+      await this.productStore.adjustStock(product.id, delta, reason, color, size);
       this.recordActivity({
         type: 'stock_adjusted', entityType: 'product', entityId: product.id,
         title: `Stock changed for ${product.name}`,
-        description: `${delta > 0 ? '+' : ''}${delta} units${color ? ` · ${color}` : ''} · ${totalStock(product)} to ${totalStock(product) + delta}.`,
+        description: `${delta > 0 ? '+' : ''}${delta} units${color ? ` · ${color}` : ''}${size ? ` / ${size}` : ''} · ${totalStock(product)} to ${totalStock(product) + delta}.`,
       });
       this.notify(`Stock for “${product.name}” updated.`);
     } catch (error) {
@@ -681,31 +705,50 @@ export class AdminDashboardComponent implements OnInit {
       : movement.delta > 0
         ? 'Added'
         : 'Removed';
-    return movement.color ? `${action} · ${movement.color}` : action;
+    return movement.color
+      ? `${action} · ${movement.color}${movement.size ? ` / ${movement.size}` : ''}`
+      : action;
   }
-  private chooseStockColor(product: Product): string | undefined {
+  private chooseStockVariant(product: Product): { color: string; size?: string } | undefined {
     if (!product.colors.length) return undefined;
-    if (product.colors.some((color) => color.stock === undefined)) {
+    if (!product.variants?.length && product.colors.some((color) => color.stock === undefined)) {
       this.inventoryError.set(
         `Open “${product.name}” and allocate its existing stock by color first.`,
       );
       return undefined;
     }
-    if (product.colors.length === 1) return product.colors[0].name;
+    let match = product.colors.length === 1 ? product.colors[0] : undefined;
     if (typeof window === 'undefined') return undefined;
-    const answer = window.prompt(
-      `Which color should be updated?\n${product.colors.map((color) => `${color.name}: ${color.stock ?? 0}`).join('\n')}`,
-      product.colors[0].name,
-    );
-    if (!answer) return undefined;
-    const match = product.colors.find(
-      (color) => color.name.toLowerCase() === answer.trim().toLowerCase(),
-    );
+    if (!match) {
+      const answer = window.prompt(
+        `Which color should be updated?\n${product.colors.map((color) => color.name).join('\n')}`,
+        product.colors[0].name,
+      );
+      if (!answer) return undefined;
+      match = product.colors.find(
+        (color) => color.name.toLowerCase() === answer.trim().toLowerCase(),
+      );
+    }
     if (!match) {
       this.inventoryError.set('Enter one of the listed color names.');
       return undefined;
     }
-    return match.name;
+    if (!product.variants?.length) return { color: match.name };
+    const sizes = product.sizes ?? [];
+    const sizeAnswer = window.prompt(
+      `Which size of ${match.name} should be updated?\n${sizes.map((size) => {
+        const stock = product.variants?.find((variant) => variant.color === match!.name && variant.size === size)?.stock ?? 0;
+        return `${size}: ${stock}`;
+      }).join('\n')}`,
+      sizes[0] ?? '',
+    );
+    if (!sizeAnswer) return undefined;
+    const size = sizes.find((item) => item.toLowerCase() === sizeAnswer.trim().toLowerCase());
+    if (!size) {
+      this.inventoryError.set('Enter one of the listed sizes.');
+      return undefined;
+    }
+    return { color: match.name, size };
   }
   movementDate(timestamp: number): string {
     return new Intl.DateTimeFormat('en-GB', {
@@ -885,6 +928,16 @@ export class AdminDashboardComponent implements OnInit {
     this.editorColorStocks.update((current) =>
       Object.fromEntries(colors.map((color) => [color, current[color] ?? (this.editingProductId() ? null : 0)])),
     );
+    this.editorVariantStocks.update((current) =>
+      Object.fromEntries(
+        colors.flatMap((color) =>
+          this.editorSizeOptions().map((size) => {
+            const key = this.variantKey(color, size);
+            return [key, current[key] ?? (this.editingProductId() ? null : 0)];
+          }),
+        ),
+      ),
+    );
     if (this.imageUploadColor() && !colors.includes(this.imageUploadColor()))
       this.imageUploadColor.set('');
   }
@@ -892,6 +945,31 @@ export class AdminDashboardComponent implements OnInit {
     const parsed = value === '' ? null : Math.max(0, Math.trunc(Number(value)) || 0);
     this.editorColorStocks.update((stocks) => ({ ...stocks, [color]: parsed }));
     this.productEditorDirty.set(true);
+  }
+  updateEditorSizes(value: string): void {
+    const sizes = this.parseList(value);
+    this.editorSizeOptions.set(sizes);
+    this.editorVariantStocks.update((current) =>
+      Object.fromEntries(
+        this.editorColorOptions().flatMap((color) =>
+          sizes.map((size) => {
+            const key = this.variantKey(color, size);
+            return [key, current[key] ?? (this.editingProductId() ? null : 0)];
+          }),
+        ),
+      ),
+    );
+  }
+  setEditorVariantStock(color: string, size: string, value: string): void {
+    const parsed = value === '' ? null : Math.max(0, Math.trunc(Number(value)) || 0);
+    this.editorVariantStocks.update((stocks) => ({
+      ...stocks,
+      [this.variantKey(color, size)]: parsed,
+    }));
+    this.productEditorDirty.set(true);
+  }
+  variantKey(color: string, size: string): string {
+    return `${color}\u0000${size}`;
   }
   assignImageColor(index: number, color: string): void {
     this.pendingImages.update((images) =>
@@ -922,8 +1000,20 @@ export class AdminDashboardComponent implements OnInit {
     };
     const purchaseCost = Number(data.get('purchaseCost'));
     const parsedColors = this.parseColors(String(data.get('colors') || ''));
+    const parsedSizes = this.parseList(String(data.get('sizes') || ''));
+    const variantStocks = this.editorVariantStocks();
+    const usesVariantStock = parsedSizes.length > 0 && Object.values(variantStocks).some((stock) => stock !== null);
+    const variants = usesVariantStock
+      ? parsedColors.flatMap((color) =>
+          parsedSizes.map((size) => ({
+            color: color.name,
+            size,
+            stock: variantStocks[this.variantKey(color.name, size)] ?? 0,
+          })),
+        )
+      : undefined;
     const colorStocks = this.editorColorStocks();
-    const usesColorStock = parsedColors.some((color) => colorStocks[color.name] !== null);
+    const usesColorStock = !usesVariantStock && parsedColors.some((color) => colorStocks[color.name] !== null);
     const colors = parsedColors.map((color) => ({
       ...color,
       ...(usesColorStock ? { stock: colorStocks[color.name] ?? 0 } : {}),
@@ -951,7 +1041,7 @@ export class AdminDashboardComponent implements OnInit {
       ...(originalPrice > 0 ? { originalPrice } : {}),
       priceMode: String(data.get('priceMode') || 'fixed') as PriceMode,
       negotiable: data.get('negotiable') === 'on',
-      ...(!usesColorStock
+      ...(!usesVariantStock && !usesColorStock
         ? { stock: existing ? totalStock(existing) : Math.max(0, Number(data.get('stock')) || 0) }
         : {}),
       lowStockThreshold: Math.max(
@@ -962,7 +1052,8 @@ export class AdminDashboardComponent implements OnInit {
       description: String(data.get('description') || '').trim(),
       images: this.pendingImages(),
       colors,
-      sizes: this.parseList(String(data.get('sizes') || '')),
+      sizes: parsedSizes,
+      ...(variants ? { variants } : {}),
       audiences: this.parseList(String(data.get('audiences') || '')),
       ageRange: String(data.get('ageRange') || '').trim(),
       tags: this.parseList(String(data.get('tags') || '')),

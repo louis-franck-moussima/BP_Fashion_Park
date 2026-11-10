@@ -30,7 +30,13 @@ export class CartService {
     this.items.update((items) =>
       existing
         ? items.map((item) =>
-            item.key === key ? { ...item, quantity: item.quantity + 1 } : item,
+            item.key === key
+              ? {
+                  ...item,
+                  imageUrl: this.imageForColor(product, color),
+                  quantity: item.quantity + 1,
+                }
+              : item,
           )
         : [
             ...items,
@@ -39,7 +45,7 @@ export class CartService {
               productId: product.id,
               name: product.name,
               category: product.category,
-              imageUrl: product.images[0]?.url ?? '',
+              imageUrl: this.imageForColor(product, color),
               color,
               size,
               quantity: 1,
@@ -49,6 +55,20 @@ export class CartService {
     );
     this.persist();
     this.open.set(true);
+  }
+
+  private imageForColor(product: Product, color: string): string {
+    const explicit = product.images.find(
+      (image) => image.color?.toLowerCase() === color.toLowerCase(),
+    );
+    if (explicit) return explicit.url;
+    if (product.images.length === product.colors.length) {
+      const index = product.colors.findIndex(
+        (item) => item.name.toLowerCase() === color.toLowerCase(),
+      );
+      if (index >= 0) return product.images[index]?.url ?? '';
+    }
+    return product.images[0]?.url ?? '';
   }
 
   changeQuantity(key: string, delta: number): void {

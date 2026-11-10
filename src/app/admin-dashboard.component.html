@@ -679,10 +679,13 @@
             <label
               >WhatsApp number<input
                 name="whatsappNumber"
+                type="tel"
                 [value]="storeSettings.settings().whatsappNumber"
-                maxlength="20"
-                placeholder="33612345678"
-              /><small>International format without the + symbol.</small></label
+                maxlength="30"
+                autocomplete="tel"
+                inputmode="tel"
+                placeholder="+237 6 70 00 00 00"
+              /><small>Validated and saved in international format.</small></label
             ><label
               >Contact email<input
                 name="contactEmail"
@@ -923,7 +926,7 @@
           >Add the colors first, then upload one or several images for each color. Format: name | #hex, separated by commas.</small
         ></label
       >
-      @if (editorColorOptions().length) {
+      @if (editorColorOptions().length && !editorSizeOptions().length) {
         <section class="color-stock-editor">
           <header><span><strong>Stock by color</strong><small>Enter the available quantity for every color.</small></span><b>{{ editorDisplayedStock() }} total</b></header>
           <div>
@@ -999,12 +1002,33 @@
       <label
         >Available sizes or lengths<input
           name="sizes"
+          (input)="updateEditorSizes($any($event.target).value)"
           placeholder="36, 37, 38 · S, M, L · 12 in, 14 in"
         /><small
           >Optional. Use sizes for shoes and clothes, or lengths for wigs.
           Separate values with commas.</small
         ></label
       >
+      @if (editorColorOptions().length && editorSizeOptions().length) {
+        <section class="variant-stock-editor">
+          <header><span><strong>Stock by color and size</strong><small>Each cell is one sellable variant.</small></span><b>{{ editorDisplayedStock() }} total</b></header>
+          <div class="variant-matrix">
+            <table>
+              <thead><tr><th>Color</th>@for (size of editorSizeOptions(); track size) { <th>{{ size }}</th> }</tr></thead>
+              <tbody>
+                @for (color of editorColorOptions(); track color) {
+                  <tr><th>{{ color }}</th>@for (size of editorSizeOptions(); track size) {
+                    <td><input type="number" min="0" max="100000" step="1" [attr.aria-label]="color + ' size ' + size + ' stock'" [value]="editorVariantStocks()[variantKey(color, size)] ?? ''" (input)="setEditorVariantStock(color, size, $any($event.target).value)" placeholder="0" /></td>
+                  }</tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (editingProductId() && editorVariantStocks()[variantKey(editorColorOptions()[0], editorSizeOptions()[0])] == null) {
+            <p>This product currently uses combined or color-only stock. Enter the quantities to allocate it by color and size.</p>
+          }
+        </section>
+      }
       @if (editorIsWig()) {
       <section class="wig-fields">
         <div>

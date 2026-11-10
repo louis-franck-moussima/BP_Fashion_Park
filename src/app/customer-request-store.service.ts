@@ -5,6 +5,8 @@ import {
   CustomerRequestStatus,
 } from './customer-request.model';
 import { CustomerRequestRepository } from './customer-request-repository.service';
+import { normalizePhoneNumber } from './phone-number';
+import type { CountryCode } from 'libphonenumber-js';
 
 @Injectable({ providedIn: 'root' })
 export class CustomerRequestStore {
@@ -18,20 +20,19 @@ export class CustomerRequestStore {
   async create(
     name: string,
     phone: string,
+    phoneCountry: CountryCode,
     city: string,
     message: string,
     items: CustomerRequestItem[],
   ): Promise<CustomerRequest> {
     const clean = {
       name: name.trim(),
-      phone: phone.trim(),
+      phone: await normalizePhoneNumber(phone, true, phoneCountry),
       city: city.trim(),
       message: message.trim(),
     };
     if (clean.name.length < 2 || clean.name.length > 80)
       throw new Error('Enter a valid name between 2 and 80 characters.');
-    if (clean.phone.length < 5 || clean.phone.length > 30)
-      throw new Error('Enter a valid phone number.');
     if (clean.city.length < 2 || clean.city.length > 80)
       throw new Error('Enter a valid city.');
     if (clean.message.length > 500)

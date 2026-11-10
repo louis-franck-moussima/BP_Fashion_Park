@@ -103,6 +103,27 @@ export function validateProduct(
         `Use unique, non-empty ${label} with no more than ${maximum} entries.`,
       );
   }
+  const variants = product.variants ?? [];
+  if (variants.length) {
+    const expectedCount = product.colors.length * (product.sizes?.length ?? 0);
+    const validColors = new Set(product.colors.map((color) => color.name));
+    const validSizes = new Set(product.sizes ?? []);
+    const keys = variants.map((variant) => `${variant.color}\u0000${variant.size}`);
+    if (
+      !product.sizes?.length ||
+      variants.length !== expectedCount ||
+      new Set(keys).size !== variants.length ||
+      variants.some(
+        (variant) =>
+          !validColors.has(variant.color) ||
+          !validSizes.has(variant.size) ||
+          !Number.isInteger(variant.stock) ||
+          variant.stock < 0 ||
+          variant.stock > 100_000,
+      )
+    )
+      errors.push('Complete the stock matrix with a valid quantity for every color and size.');
+  }
   if ((product.ageRange ?? '').length > 80)
     errors.push('Age range must not exceed 80 characters.');
   const related = product.relatedProductIds ?? [];

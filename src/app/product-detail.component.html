@@ -48,14 +48,17 @@
             }
           </span>
         </div>
-        @if (visibleImages().length > 1) {
+        @if (visibleImages().length) {
           <div class="gallery-thumbs">
             @for (image of visibleImages(); track image.url; let i = $index) {
               <button
                 [class.active]="selectedImage() === i"
-                (click)="selectedImage.set(i)"
+                [class.color-selected]="imageColorAt(i)?.toLowerCase() === selectedColor()?.name?.toLowerCase()"
+                (click)="selectGalleryImage(i)"
+                [attr.aria-label]="'View ' + (imageColorAt(i) || item.name) + ' image'"
               >
                 <img [src]="image.url" [alt]="image.alt" />
+                @if (imageColorAt(i); as imageColor) { <small>{{ imageColor }}</small> }
               </button>
             }
           </div>
@@ -123,7 +126,9 @@
             ><small>{{
               totalStock() === 0
                 ? "Check again soon for availability."
-                : totalStock() + " pieces available"
+                : item.variants?.length
+                  ? "Choose a color and size to confirm availability."
+                  : "This product is currently available."
             }}</small>
           </div>
         </div>
@@ -136,12 +141,12 @@
               <button
                 [class.selected]="selectedColor()?.name === color.name"
                 (click)="selectColor(color)"
-                [disabled]="color.stock === 0"
+                [disabled]="colorStock(color.name) === 0"
                 [attr.aria-label]="'Select ' + color.name"
               >
                 <i [style.background]="color.hex"></i
                 ><span>{{ color.name }}</span
-                ><small>{{ color.stock !== undefined ? color.stock + " available" : "Color option" }}</small>
+                ><small>{{ colorStock(color.name) > 0 ? "Available" : "Sold out" }}</small>
               </button>
             }
           </div>
@@ -156,8 +161,9 @@
                 <button
                   [class.selected]="selectedSize() === size"
                   (click)="selectSize(size)"
+                  [disabled]="!isSizeAvailable(size)"
                 >
-                  {{ size }}
+                  {{ size }}@if (item.variants?.length) { <small>{{ variantStock(selectedColor()?.name || '', size) > 0 ? "Available" : "Sold out" }}</small> }
                 </button>
               }
             </div>
@@ -221,11 +227,7 @@
                 ><small
                   class="rec-stock"
                   [class.out]="stockOf(other.id) === 0"
-                  >{{
-                    stockOf(other.id)
-                      ? stockOf(other.id) + " available"
-                      : "Out of stock"
-                  }}</small
+                  >{{ stockLabel(other.id) }}</small
                 >
               </figure>
               <div class="rec-info">

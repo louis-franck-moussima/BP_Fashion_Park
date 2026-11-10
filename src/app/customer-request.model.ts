@@ -8,6 +8,7 @@ export interface CustomerRequestItem {
   size: string;
   quantity: number;
   priceLabel: string;
+  imageUrl?: string;
 }
 
 export interface CustomerRequest {

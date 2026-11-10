@@ -39,7 +39,7 @@ service cloud.firestore {
         ])
         && request.resource.data.keys().hasOnly([
           'id', 'name', 'sku', 'status', 'category', 'price', 'originalPrice', 'priceMode', 'negotiable', 'stock', 'lowStockThreshold', 'art',
-          'description', 'images', 'colors', 'sizes', 'audiences', 'ageRange', 'tags',
+          'description', 'images', 'colors', 'sizes', 'variants', 'audiences', 'ageRange', 'tags',
           'featured', 'newArrival', 'limitedQuantity', 'relatedProductIds', 'wigDetails', 'createdAt'
         ])
         && data.id is string && data.id == productId && data.id.size() <= 160
@@ -60,6 +60,7 @@ service cloud.firestore {
         && data.images is list && data.images.size() >= 1 && data.images.size() <= 8
         && data.colors is list && data.colors.size() >= 1 && data.colors.size() <= 20
         && (!('sizes' in data) || (data.sizes is list && data.sizes.size() <= 30))
+        && (!('variants' in data) || (data.variants is list && data.variants.size() <= 600))
         && (!('audiences' in data) || (data.audiences is list && data.audiences.size() <= 10))
         && (!('ageRange' in data) || (data.ageRange is string && data.ageRange.size() <= 80))
         && (!('tags' in data) || (data.tags is list && data.tags.size() <= 30))
@@ -119,7 +120,7 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow create: if isAdmin()
         && request.resource.data.keys().hasAll(['id', 'productId', 'delta', 'previousStock', 'newStock', 'reason', 'createdAt'])
-        && request.resource.data.keys().hasOnly(['id', 'productId', 'delta', 'previousStock', 'newStock', 'reason', 'color', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['id', 'productId', 'delta', 'previousStock', 'newStock', 'reason', 'color', 'size', 'createdAt'])
         && request.resource.data.id == movementId
         && request.resource.data.productId == productId
         && request.resource.data.delta is int && request.resource.data.delta != 0
@@ -128,9 +129,12 @@ service cloud.firestore {
         && request.resource.data.newStock == request.resource.data.previousStock + request.resource.data.delta
         && request.resource.data.reason in ['increase', 'decrease', 'restock']
         && (!('color' in request.resource.data) || (request.resource.data.color is string && request.resource.data.color.size() >= 1 && request.resource.data.color.size() <= 40))
+        && (!('size' in request.resource.data) || (request.resource.data.size is string && request.resource.data.size.size() >= 1 && request.resource.data.size.size() <= 50))
         && (request.resource.data.reason == 'decrease' ? request.resource.data.delta < 0 : request.resource.data.delta > 0)
         && (
-          ('color' in request.resource.data
+          ('size' in request.resource.data
+            && getAfter(/databases/$(database)/documents/products/$(productId)).data.variants != resource.data.variants)
+          || ('color' in request.resource.data && !('size' in request.resource.data)
             && getAfter(/databases/$(database)/documents/products/$(productId)).data.colors != resource.data.colors)
           || (!('color' in request.resource.data)
             && getAfter(/databases/$(database)/documents/products/$(productId)).data.stock == request.resource.data.newStock)

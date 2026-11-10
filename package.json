@@ -32,6 +32,8 @@
     "express": "^5.1.0",
     "firebase": "^12.5.0",
     "flatpickr": "^4.6.13",
+    "jspdf": "^4.2.1",
+    "libphonenumber-js": "^1.13.16",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },

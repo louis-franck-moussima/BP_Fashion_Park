@@ -12,6 +12,12 @@ export interface ProductColor {
   stock?: number;
 }
 
+export interface ProductVariant {
+  color: string;
+  size: string;
+  stock: number;
+}
+
 export interface WigDetails {
   length?: string;
   texture?: string;
@@ -41,6 +47,7 @@ export interface StockMovement {
   newStock: number;
   reason: StockMovementReason;
   color?: string;
+  size?: string;
   createdAt: number;
 }
 
@@ -61,6 +68,7 @@ export interface Product {
   images: ProductImage[];
   colors: ProductColor[];
   sizes?: string[];
+  variants?: ProductVariant[];
   audiences?: string[];
   ageRange?: string;
   tags?: string[];
@@ -80,7 +88,9 @@ export interface ProductImage {
 }
 
 export const totalStock = (product: Product) =>
-  product.colors.some((color) => color.stock !== undefined)
+  product.variants?.length
+    ? product.variants.reduce((sum, variant) => sum + variant.stock, 0)
+    : product.colors.some((color) => color.stock !== undefined)
     ? product.colors.reduce((sum, color) => sum + (color.stock ?? 0), 0)
     : product.stock ?? 0;
 
