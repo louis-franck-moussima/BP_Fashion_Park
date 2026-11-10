@@ -607,6 +607,7 @@
                       tabindex="0"
                       (click)="openProduct(product.id)"
                       (keydown.enter)="openProduct(product.id)"
+                      (mouseleave)="resetProductColorPreview(product.id)"
                     >
                       <span class="product-badges">
                         @if (product.newArrival) {
@@ -626,8 +627,8 @@
                       >
                       @if (product.images.length) {
                         <img
-                          [src]="product.images[0].url"
-                          [alt]="product.images[0].alt || product.name"
+                          [src]="productCardImage(product).url"
+                          [alt]="productCardImage(product).alt || product.name"
                         /><span class="photo-count"
                           >▧ {{ product.images.length }}</span
                         >
@@ -662,12 +663,21 @@
                     </div>
                     <p class="product-description">{{ product.description }}</p>
                     <div class="product-footer">
-                      <div class="swatches" aria-label="Available colors">
+                      <div class="swatches product-card-swatches" aria-label="Choose a color preview">
                         @for (color of product.colors; track color.name) {
-                          <span
-                            [style.background]="color.hex"
-                            [title]="color.name"
-                          ></span>
+                          <button
+                            type="button"
+                            class="product-card-swatch"
+                            [class.active]="productColorPreviews()[product.id] === color.name"
+                            [class.sold-out]="!productColorAvailable(product, color.name)"
+                            [attr.aria-label]="color.name + (!productColorAvailable(product, color.name) ? ', sold out' : '')"
+                            [attr.aria-pressed]="productColorPreviews()[product.id] === color.name"
+                            [disabled]="!productColorAvailable(product, color.name)"
+                            [title]="color.name + (!productColorAvailable(product, color.name) ? ' — Sold out' : '')"
+                            (mouseenter)="previewProductColor(product, color.name, $event)"
+                            (focus)="previewProductColor(product, color.name, $event)"
+                            (click)="previewProductColor(product, color.name, $event)"
+                          ><span [style.background]="color.hex"></span></button>
                         }
                       </div>
                       @if (auth.user()) {
@@ -1039,6 +1049,30 @@
             <span
               ><small>See new arrivals</small><strong>Instagram</strong></span
             >
+          </a>
+        }
+        @if (storeSettings.settings().facebookUrl) {
+          <a
+            class="social-link facebook"
+            [href]="storeSettings.settings().facebookUrl"
+            target="_blank"
+            rel="noopener"
+            aria-label="Follow BP Fashion Park on Facebook"
+          >
+            <span class="social-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 8.2V6.6c0-.8.5-1 1-1h2.6V1.7h-3.6c-3.7 0-4.6 2.8-4.6 4.6v1.9H7.2V12h2.4v10.3h4.6V12h3.1l.5-3.8h-3.6Z" /></svg></span>
+            <span><small>Follow our page</small><strong>Facebook</strong></span>
+          </a>
+        }
+        @if (storeSettings.settings().tiktokUrl) {
+          <a
+            class="social-link tiktok"
+            [href]="storeSettings.settings().tiktokUrl"
+            target="_blank"
+            rel="noopener"
+            aria-label="Follow BP Fashion Park on TikTok"
+          >
+            <span class="social-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="tiktok-shadow-cyan" d="M15.8 3.1c.8 2 2.2 3.2 4.2 3.5v3.3a9 9 0 0 1-4.2-1.2v6.5a6.4 6.4 0 1 1-5.5-6.3v3.4a3.1 3.1 0 1 0 2.2 3V3.1h3.3Z"/><path class="tiktok-shadow-red" d="M17 2c.7 1.9 2.1 3.1 4 3.4v3.3a8.9 8.9 0 0 1-4-1.2V14a6.4 6.4 0 1 1-5.6-6.3V11a3.1 3.1 0 1 0 2.3 3V2H17Z"/><path class="tiktok-mark" d="M16.4 2.5c.7 1.9 2.1 3.1 4 3.4v3.3a8.9 8.9 0 0 1-4-1.2v6.5a6.4 6.4 0 1 1-5.6-6.3v3.4a3.1 3.1 0 1 0 2.3 3V2.5h3.3Z"/></svg></span>
+            <span><small>Watch our videos</small><strong>TikTok</strong></span>
           </a>
         }
       </div>

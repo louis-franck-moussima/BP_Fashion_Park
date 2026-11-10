@@ -402,6 +402,8 @@ export class AdminDashboardComponent implements OnInit {
           false,
         ),
         instagramUrl: String(data.get('instagramUrl') || '').trim(),
+        facebookUrl: String(data.get('facebookUrl') || '').trim(),
+        tiktokUrl: String(data.get('tiktokUrl') || '').trim(),
         contactEmail: String(data.get('contactEmail') || '').trim(),
         businessAddress: String(data.get('businessAddress') || '').trim(),
         deliveryInformation: String(data.get('deliveryInformation') || '').trim(),

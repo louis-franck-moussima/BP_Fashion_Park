@@ -36,7 +36,7 @@ type Language = 'en' | 'fr';
   selector: 'app-root',
   imports: [RouterOutlet],
   templateUrl: './app.html',
-  styleUrls: ['./app.css', './app-catalog-nav.css', './app-category-photography.css'],
+  styleUrls: ['./app.css', './app-catalog-nav.css', './app-category-photography.css', './app-product-card-colors.css', './app-socials.css'],
 })
 export class App implements OnInit, OnDestroy {
   private heroTimer?: ReturnType<typeof setInterval>;
@@ -58,6 +58,7 @@ export class App implements OnInit, OnDestroy {
   readonly searchQuery = signal('');
   readonly sortBy = signal<SortOption>('newest');
   readonly inStockOnly = signal(false);
+  readonly productColorPreviews = signal<Record<string, string>>({});
   readonly email = signal('');
   readonly subscribed = signal(false);
   readonly adminOpen = signal(false);
@@ -124,6 +125,54 @@ export class App implements OnInit, OnDestroy {
     if (stock <= (product.lowStockThreshold ?? 3) || product.limitedQuantity)
       return 'Limited quantity';
     return 'Available';
+  }
+  productCardImage(product: Product): ProductImage {
+    const colorName = this.productColorPreviews()[product.id];
+    if (colorName) {
+      const exactImage = product.images.find(
+        (image) => image.color?.toLowerCase() === colorName.toLowerCase(),
+      );
+      if (exactImage) return exactImage;
+
+      // Products created before color tagging used the same order for images and colors.
+      if (product.images.length === product.colors.length) {
+        const colorIndex = product.colors.findIndex(
+          (color) => color.name.toLowerCase() === colorName.toLowerCase(),
+        );
+        if (colorIndex >= 0) return product.images[colorIndex];
+      }
+    }
+    return product.images[0];
+  }
+  previewProductColor(product: Product, colorName: string, event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!this.productColorAvailable(product, colorName)) return;
+    this.productColorPreviews.update((previews) => ({
+      ...previews,
+      [product.id]: colorName,
+    }));
+  }
+  resetProductColorPreview(productId: string): void {
+    this.productColorPreviews.update((previews) => {
+      if (!previews[productId]) return previews;
+      const next = { ...previews };
+      delete next[productId];
+      return next;
+    });
+  }
+  productColorAvailable(product: Product, colorName: string): boolean {
+    if (product.variants?.length) {
+      return product.variants.some(
+        (variant) =>
+          variant.color.toLowerCase() === colorName.toLowerCase() &&
+          variant.stock > 0,
+      );
+    }
+    const color = product.colors.find(
+      (item) => item.name.toLowerCase() === colorName.toLowerCase(),
+    );
+    return color?.stock !== undefined ? color.stock > 0 : totalStock(product) > 0;
   }
   readonly whatsappContactUrl = computed(() =>
     this.storeSettings.whatsappUrl('Hello BP Fashion Park'),

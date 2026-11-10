@@ -1,0 +1,31 @@
+/* Official platform colors keep the footer links immediately recognizable. */
+.footer-socials .whatsapp .social-icon {
+  background: #25d366;
+  color: #fff;
+}
+
+.footer-socials .instagram .social-icon {
+  background: radial-gradient(circle at 32% 100%, #ffd600 0 24%, #ff7a00 36%, #ff0169 58%, #d300c5 76%, #7638fa 100%);
+  color: #fff;
+}
+
+.footer-socials .facebook .social-icon {
+  background: #1877f2;
+  color: #fff;
+}
+
+.footer-socials .tiktok .social-icon {
+  background: #000;
+}
+
+.footer-socials .tiktok .social-icon svg {
+  overflow: visible;
+}
+
+.tiktok-shadow-cyan { fill: #25f4ee; transform: translate(-.7px, .5px); }
+.tiktok-shadow-red { fill: #fe2c55; transform: translate(.7px, -.4px); }
+.tiktok-mark { fill: #fff; }
+
+.footer-socials .social-link:hover .social-icon {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .2);
+}

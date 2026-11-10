@@ -57,8 +57,9 @@ export class StoreSettingsService {
     const phone = settings.whatsappNumber.replace(/[\s()+-]/g, '');
     if (phone && !/^\d{6,20}$/.test(phone))
       throw new Error('WhatsApp number must use international format.');
-    if (settings.instagramUrl && !/^https:\/\//i.test(settings.instagramUrl))
-      throw new Error('Instagram URL must begin with https://.');
+    const socialUrls = [settings.instagramUrl, settings.facebookUrl, settings.tiktokUrl];
+    if (socialUrls.some((url) => url && !/^https:\/\//i.test(url)))
+      throw new Error('Social media URLs must begin with https://.');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.contactEmail))
       throw new Error('Enter a valid contact email.');
     if (!['EUR', 'USD', 'GBP', 'XOF', 'CDF'].includes(settings.currency))
