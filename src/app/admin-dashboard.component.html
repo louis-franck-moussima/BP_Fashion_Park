@@ -403,6 +403,11 @@
             <span>Catalog structure</span>
             <h2>Category hierarchy</h2>
           </div>
+          @if (auth.user()) {
+            <button type="button" class="category-structure-action" (click)="simplifyCategoryStructure()" [disabled]="categoryMigrationBusy()">
+              {{ categoryMigrationBusy() ? "Updating structure…" : "Apply simpler structure" }}
+            </button>
+          }
         </div>
         @if (auth.user()) {
           <form class="dashboard-category-form" (submit)="addCategory($event)">
@@ -820,13 +825,32 @@
       </select><small>New products remain private until you publish them.</small></label>
       <div class="editor-form-row">
         <label
-          >Category<select name="category" required (change)="setEditorCategory($any($event.target).value)">
-            @for (category of categoryStore.active(); track category.id) {
+          >Department<select name="rootCategory" required [value]="editorRootCategoryId()" (change)="setEditorRootCategory($any($event.target).value)">
+            <option value="" disabled>Choose a department</option>
+            @for (category of categoryStore.roots(); track category.id) {
               <option [value]="category.id">
-                {{ categoryStore.pathLabel(category.id) }}
+                {{ category.name }}
               </option>
             }
-          </select></label
+          </select><small>Women, Men, Children, Unisex or Travel.</small></label
+        ><label
+          >Product group<select name="productGroup" required [value]="editorGroupCategoryId()" (change)="setEditorGroupCategory($any($event.target).value)">
+            <option value="" disabled>Choose a product group</option>
+            @for (category of editorGroups(); track category.id) {
+              <option [value]="category.id">
+                {{ category.name }}
+              </option>
+            }
+          </select><small>Clothing, Shoes, Accessories, Wigs, etc.</small></label>
+      </div>
+      <div class="editor-form-row">
+        <label
+          >Product type (optional)<select name="category" [value]="editorCategoryId()" (change)="setEditorCategory($any($event.target).value)">
+            <option value="">Use the product group</option>
+            @for (category of editorProductTypes(); track category.id) {
+              <option [value]="category.id">{{ category.name }}</option>
+            }
+          </select><small>For example Dresses, Sandals or Bags.</small></label
         ><label
           >Price mode<select name="priceMode">
             <option value="fixed">Fixed price</option>

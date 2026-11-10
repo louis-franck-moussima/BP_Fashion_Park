@@ -9,12 +9,13 @@ export const STARTER_CATEGORIES: Category[] = [
   { id: 'children', name: 'Children', slug: 'children', description: 'Clothing, shoes and accessories for children', parentCategoryId: null, active: true, displayOrder: 3 },
   { id: 'unisex', name: 'Unisex', slug: 'unisex', description: 'Shared styles selected for everyone', parentCategoryId: null, active: true, displayOrder: 4 },
   { id: 'beauty-hair', name: 'Beauty & Hair', slug: 'beauty-hair', description: 'Wigs and hair essentials', parentCategoryId: null, active: true, displayOrder: 5 },
-  { id: 'accessories', name: 'Accessories', slug: 'accessories', description: 'Bags, jewelry and finishing touches', parentCategoryId: null, active: true, displayOrder: 6 },
-  { id: 'travel', name: 'Travel', slug: 'travel', description: 'Suitcases and travel essentials', parentCategoryId: null, active: true, displayOrder: 7 },
+  { id: 'travel', name: 'Travel', slug: 'travel', description: 'Suitcases and travel essentials', parentCategoryId: null, active: true, displayOrder: 6 },
   { id: 'women-clothing', name: 'Clothing', slug: 'clothing', description: 'Dresses, skirts and everyday pieces for women', parentCategoryId: 'women', active: true, displayOrder: 10 },
   { id: 'women-shoes', name: 'Shoes', slug: 'shoes', description: 'Shoes for women', parentCategoryId: 'women', active: true, displayOrder: 11 },
-  { id: 'men-clothing', name: 'Clothing', slug: 'clothing', description: 'Shirts, trousers and modern essentials for men', parentCategoryId: 'men', active: true, displayOrder: 12 },
-  { id: 'men-shoes', name: 'Shoes', slug: 'shoes', description: 'Shoes for men', parentCategoryId: 'men', active: true, displayOrder: 13 },
+  { id: 'women-accessories', name: 'Accessories', slug: 'accessories', description: 'Bags, jewelry and finishing touches for women', parentCategoryId: 'women', active: true, displayOrder: 12 },
+  { id: 'men-clothing', name: 'Clothing', slug: 'clothing', description: 'Shirts, trousers and modern essentials for men', parentCategoryId: 'men', active: true, displayOrder: 13 },
+  { id: 'men-shoes', name: 'Shoes', slug: 'shoes', description: 'Shoes for men', parentCategoryId: 'men', active: true, displayOrder: 14 },
+  { id: 'men-accessories', name: 'Accessories', slug: 'accessories', description: 'Bags, belts and finishing touches for men', parentCategoryId: 'men', active: true, displayOrder: 15 },
   { id: 'children-clothing', name: 'Clothing', slug: 'clothing', description: 'Comfortable everyday clothing for children', parentCategoryId: 'children', active: true, displayOrder: 14 },
   { id: 'children-shoes', name: 'Shoes', slug: 'shoes', description: 'Everyday and occasion footwear for children', parentCategoryId: 'children', active: true, displayOrder: 15 },
   { id: 'children-accessories', name: 'Accessories', slug: 'accessories', description: 'Bags, hats and finishing touches for children', parentCategoryId: 'children', active: true, displayOrder: 16 },
@@ -22,11 +23,21 @@ export const STARTER_CATEGORIES: Category[] = [
   { id: 'unisex-shoes', name: 'Shoes', slug: 'shoes', description: 'Shared footwear styles', parentCategoryId: 'unisex', active: true, displayOrder: 18 },
   { id: 'unisex-accessories', name: 'Accessories', slug: 'accessories', description: 'Versatile accessories for every wardrobe', parentCategoryId: 'unisex', active: true, displayOrder: 19 },
   { id: 'beauty-wigs', name: 'Wigs', slug: 'wigs', description: 'Wigs in different styles, colors and lengths', parentCategoryId: 'beauty-hair', active: true, displayOrder: 20 },
-  { id: 'accessories-bags', name: 'Bags', slug: 'bags', description: 'Handbags, totes and everyday bags', parentCategoryId: 'accessories', active: true, displayOrder: 21 },
-  { id: 'accessories-jewelry', name: 'Jewelry', slug: 'jewelry', description: 'Necklaces and finishing touches', parentCategoryId: 'accessories', active: true, displayOrder: 22 },
-  { id: 'accessories-belts', name: 'Belts', slug: 'belts', description: 'Practical and statement belts', parentCategoryId: 'accessories', active: true, displayOrder: 23 },
-  { id: 'accessories-hats', name: 'Hats', slug: 'hats', description: 'Seasonal hats and headwear', parentCategoryId: 'accessories', active: true, displayOrder: 24 },
-  { id: 'accessories-sunglasses', name: 'Sunglasses', slug: 'sunglasses', description: 'Everyday sunglasses', parentCategoryId: 'accessories', active: true, displayOrder: 25 },
+  { id: 'women-bags', name: 'Bags', slug: 'bags', description: 'Handbags, totes and everyday bags', parentCategoryId: 'women-accessories', active: true, displayOrder: 21 },
+  { id: 'women-jewelry', name: 'Jewelry', slug: 'jewelry', description: 'Necklaces and finishing touches', parentCategoryId: 'women-accessories', active: true, displayOrder: 22 },
+  { id: 'women-belts', name: 'Belts', slug: 'belts', description: 'Practical and statement belts', parentCategoryId: 'women-accessories', active: true, displayOrder: 23 },
+  { id: 'women-hats', name: 'Hats', slug: 'hats', description: 'Seasonal hats and headwear', parentCategoryId: 'women-accessories', active: true, displayOrder: 24 },
+  { id: 'women-sunglasses', name: 'Sunglasses', slug: 'sunglasses', description: 'Everyday sunglasses', parentCategoryId: 'women-accessories', active: true, displayOrder: 25 },
+  { id: 'men-bags', name: 'Bags', slug: 'bags', description: 'Bags selected for men', parentCategoryId: 'men-accessories', active: true, displayOrder: 26 },
+  { id: 'men-belts', name: 'Belts', slug: 'belts', description: 'Belts for men', parentCategoryId: 'men-accessories', active: true, displayOrder: 27 },
+  { id: 'men-hats', name: 'Hats', slug: 'hats', description: 'Hats and headwear for men', parentCategoryId: 'men-accessories', active: true, displayOrder: 28 },
+  { id: 'men-sunglasses', name: 'Sunglasses', slug: 'sunglasses', description: 'Sunglasses for men', parentCategoryId: 'men-accessories', active: true, displayOrder: 29 },
+  { id: 'children-bags', name: 'Bags', slug: 'bags', description: 'Bags for children', parentCategoryId: 'children-accessories', active: true, displayOrder: 30 },
+  { id: 'children-hats', name: 'Hats', slug: 'hats', description: 'Hats for children', parentCategoryId: 'children-accessories', active: true, displayOrder: 31 },
+  { id: 'unisex-bags', name: 'Bags', slug: 'bags', description: 'Shared everyday bags', parentCategoryId: 'unisex-accessories', active: true, displayOrder: 32 },
+  { id: 'unisex-belts', name: 'Belts', slug: 'belts', description: 'Shared belt styles', parentCategoryId: 'unisex-accessories', active: true, displayOrder: 33 },
+  { id: 'unisex-hats', name: 'Hats', slug: 'hats', description: 'Shared hats and headwear', parentCategoryId: 'unisex-accessories', active: true, displayOrder: 34 },
+  { id: 'unisex-sunglasses', name: 'Sunglasses', slug: 'sunglasses', description: 'Shared sunglasses', parentCategoryId: 'unisex-accessories', active: true, displayOrder: 35 },
   { id: 'travel-suitcases', name: 'Suitcases', slug: 'suitcases', description: 'Cabin, medium and large suitcases', parentCategoryId: 'travel', active: true, displayOrder: 26 },
   { id: 'women-dresses', name: 'Dresses', slug: 'dresses', description: 'Everyday and occasion dresses', parentCategoryId: 'women-clothing', active: true, displayOrder: 30 },
   { id: 'women-skirts', name: 'Skirts', slug: 'skirts', description: 'Midi, pleated and everyday skirts', parentCategoryId: 'women-clothing', active: true, displayOrder: 31 },
@@ -148,6 +159,22 @@ export class CategoryStore {
     if (this.categories().length) throw new Error('The catalog already contains categories.');
     await this.repository.saveMany(STARTER_CATEGORIES);
     this.categories.set(STARTER_CATEGORIES.map(category => ({ ...category })));
+  }
+
+  async applySimplifiedStructure(): Promise<void> {
+    if (!this.repository.configured)
+      throw new Error('Firebase must be connected before updating categories.');
+    const obsoleteIds = new Set([
+      'accessories', 'accessories-bags', 'accessories-jewelry',
+      'accessories-belts', 'accessories-hats', 'accessories-sunglasses',
+    ]);
+    const obsolete = this.categories()
+      .filter(category => obsoleteIds.has(category.id))
+      .map(category => ({ ...category, active: false }));
+    await this.repository.saveMany([...STARTER_CATEGORIES, ...obsolete]);
+    const merged = new Map(this.categories().map(category => [category.id, category]));
+    [...STARTER_CATEGORIES, ...obsolete].forEach(category => merged.set(category.id, { ...category }));
+    this.categories.set([...merged.values()]);
   }
 
   async remove(id: string): Promise<void> {

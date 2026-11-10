@@ -140,7 +140,17 @@ export class AdminDashboardComponent implements OnInit {
   readonly productEditorOpen = signal(false);
   readonly editingProductId = signal<string | null>(null);
   readonly pendingImages = signal<ProductImage[]>([]);
+  readonly editorRootCategoryId = signal('');
+  readonly editorGroupCategoryId = signal('');
   readonly editorCategoryId = signal('');
+  readonly editorGroups = computed(() => {
+    const rootId = this.editorRootCategoryId();
+    return rootId ? this.categoryStore.children(rootId) : [];
+  });
+  readonly editorProductTypes = computed(() => {
+    const groupId = this.editorGroupCategoryId();
+    return groupId ? this.categoryStore.children(groupId) : [];
+  });
   readonly editorColorOptions = signal<string[]>([]);
   readonly editorColorStocks = signal<Record<string, number | null>>({});
   readonly editorSizeOptions = signal<string[]>([]);
@@ -166,7 +176,7 @@ export class AdminDashboardComponent implements OnInit {
   });
   readonly imageUploadColor = signal('');
   readonly editorIsWig = computed(() =>
-    this.categoryStore.path(this.editorCategoryId()).some(
+    this.categoryStore.path(this.editorCategoryId() || this.editorGroupCategoryId()).some(
       (category) => category.id.toLowerCase().includes('wig') || category.name.toLowerCase().includes('wig'),
     ),
   );
@@ -206,6 +216,7 @@ export class AdminDashboardComponent implements OnInit {
   readonly categoryImageToDelete = signal<ProductImage | null>(null);
   readonly categoryUploadedThisSession = signal<ProductImage | null>(null);
   readonly categoryImageUploading = signal(false);
+  readonly categoryMigrationBusy = signal(false);
   readonly editingCategoryId = signal<string | null>(null);
   readonly categoryKind = signal<'category' | 'subcategory'>('category');
   readonly importingStarterCategories = signal(false);
@@ -451,7 +462,11 @@ export class AdminDashboardComponent implements OnInit {
     if (!this.auth.user()) return;
     this.editingProductId.set(null);
     this.pendingImages.set([]);
-    this.editorCategoryId.set(this.categoryStore.active()[0]?.id ?? '');
+    const root = this.categoryStore.roots()[0];
+    this.editorRootCategoryId.set(root?.id ?? '');
+    const group = root ? this.categoryStore.children(root.id)[0] : undefined;
+    this.editorGroupCategoryId.set(group?.id ?? '');
+    this.editorCategoryId.set('');
     this.editorColorOptions.set([]);
     this.editorColorStocks.set({});
     this.editorSizeOptions.set([]);
@@ -468,7 +483,7 @@ export class AdminDashboardComponent implements OnInit {
     if (!this.auth.user()) return;
     this.editingProductId.set(product.id);
     this.pendingImages.set([...(product.images ?? [])]);
-    this.editorCategoryId.set(product.category);
+    this.setEditorProductCategory(product.category);
     this.editorColorOptions.set(product.colors.map((color) => color.name));
     this.editorColorStocks.set(Object.fromEntries(
       product.colors.map((color) => [color.name, color.stock ?? null]),
@@ -490,7 +505,7 @@ export class AdminDashboardComponent implements OnInit {
     if (!this.auth.user()) return;
     this.editingProductId.set(null);
     this.pendingImages.set([...(product.images ?? [])]);
-    this.editorCategoryId.set(product.category);
+    this.setEditorProductCategory(product.category);
     this.editorColorOptions.set(product.colors.map((color) => color.name));
     this.editorColorStocks.set(Object.fromEntries(
       product.colors.map((color) => [color.name, color.stock ?? 0]),
@@ -921,8 +936,26 @@ export class AdminDashboardComponent implements OnInit {
       return result;
     });
   }
+  setEditorRootCategory(categoryId: string): void {
+    this.editorRootCategoryId.set(categoryId);
+    const group = this.categoryStore.children(categoryId)[0];
+    this.editorGroupCategoryId.set(group?.id ?? '');
+    this.editorCategoryId.set('');
+    this.productEditorDirty.set(true);
+  }
+  setEditorGroupCategory(categoryId: string): void {
+    this.editorGroupCategoryId.set(categoryId);
+    this.editorCategoryId.set('');
+    this.productEditorDirty.set(true);
+  }
   setEditorCategory(categoryId: string): void {
     this.editorCategoryId.set(categoryId);
+  }
+  private setEditorProductCategory(categoryId: string): void {
+    const path = this.categoryStore.path(categoryId);
+    this.editorRootCategoryId.set(path[0]?.id ?? '');
+    this.editorGroupCategoryId.set(path[1]?.id ?? '');
+    this.editorCategoryId.set(path[2]?.id ?? '');
   }
   updateEditorColors(value: string): void {
     const colors = this.parseColors(value).map((color) => color.name);
@@ -1038,7 +1071,7 @@ export class AdminDashboardComponent implements OnInit {
       sku: String(data.get('sku') || '')
         .trim()
         .toUpperCase(),
-      category: String(data.get('category') || ''),
+      category: String(data.get('category') || data.get('productGroup') || ''),
       price: Number(data.get('price')),
       ...(originalPrice > 0 ? { originalPrice } : {}),
       priceMode: String(data.get('priceMode') || 'fixed') as PriceMode,
@@ -1066,6 +1099,10 @@ export class AdminDashboardComponent implements OnInit {
       ...(this.editorIsWig() && Object.values(wigDetails).some(Boolean) ? { wigDetails } : {}),
       createdAt: existing?.createdAt ?? Date.now(),
     };
+    if (!String(data.get('rootCategory') || '') || !String(data.get('productGroup') || '')) {
+      this.formError.set('Choose both a department and a product group.');
+      return;
+    }
     const validationErrors = validateProduct(
       product,
       new Set(this.categoryStore.active().map((category) => category.id)),
@@ -1360,6 +1397,46 @@ export class AdminDashboardComponent implements OnInit {
       this.importingStarterCategories.set(false);
     }
   }
+  async simplifyCategoryStructure(): Promise<void> {
+    if (!this.auth.user() || this.categoryMigrationBusy()) return;
+    if (typeof window !== 'undefined' && !window.confirm(
+      'Create the simpler department structure, move products from the old Accessories branch, and hide that old branch?',
+    )) return;
+    this.categoryMigrationBusy.set(true);
+    this.categoryError.set('');
+    try {
+      await this.categoryStore.applySimplifiedStructure();
+      const accessoryTargets: Record<string, string> = {
+        'accessories-bags': 'bags',
+        'accessories-jewelry': 'jewelry',
+        'accessories-belts': 'belts',
+        'accessories-hats': 'hats',
+        'accessories-sunglasses': 'sunglasses',
+      };
+      let moved = 0;
+      for (const product of this.products()) {
+        const type = accessoryTargets[product.category];
+        if (!type) continue;
+        const audiences = new Set((product.audiences ?? []).map(value => value.toLowerCase()));
+        const department = audiences.has('women') || audiences.has('woman') || audiences.has('girls')
+          ? 'women'
+          : audiences.has('men') || audiences.has('man') || audiences.has('boys')
+            ? 'men'
+            : audiences.has('children') || audiences.has('kids')
+              ? 'children'
+              : 'unisex';
+        let target = `${department}-${type}`;
+        if (!this.categoryStore.find(target)) target = `${department}-accessories`;
+        await this.productStore.save({ ...product, category: target });
+        moved += 1;
+      }
+      this.notify(`Simpler catalog structure applied. ${moved} product${moved === 1 ? '' : 's'} moved.`);
+    } catch (error) {
+      this.categoryError.set(error instanceof Error ? error.message : 'The catalog structure could not be updated.');
+    } finally {
+      this.categoryMigrationBusy.set(false);
+    }
+  }
   async setCategoryVisibility(
     category: Category,
     active: boolean,
@@ -1494,8 +1571,12 @@ export class AdminDashboardComponent implements OnInit {
       product.sku ?? '';
     (form.elements.namedItem('status') as HTMLSelectElement).value =
       productStatus(product);
+    (form.elements.namedItem('rootCategory') as HTMLSelectElement).value =
+      this.editorRootCategoryId();
+    (form.elements.namedItem('productGroup') as HTMLSelectElement).value =
+      this.editorGroupCategoryId();
     (form.elements.namedItem('category') as HTMLSelectElement).value =
-      product.category;
+      this.editorCategoryId();
     (form.elements.namedItem('price') as HTMLInputElement).value = String(
       product.price,
     );
