@@ -19,6 +19,8 @@ export interface CustomerRequest {
   message: string;
   items: CustomerRequestItem[];
   status: CustomerRequestStatus;
+  ownerNotes?: string;
+  followUpAt?: number | null;
   createdAt: number;
   updatedAt: number;
 }

@@ -1,5 +1,10 @@
 export type ProductCategory = string;
 export type PriceMode = 'fixed' | 'from' | 'on-request';
+export type ProductPublicationStatus =
+  | 'draft'
+  | 'published'
+  | 'hidden'
+  | 'archived';
 
 export interface ProductColor {
   name: string;
@@ -12,6 +17,18 @@ export interface WigDetails {
   texture?: string;
   laceType?: string;
   density?: string;
+}
+
+export interface ProductPurchasingInfo {
+  productId: string;
+  supplierName?: string;
+  supplierContact?: string;
+  supplierReference?: string;
+  purchaseCost?: number;
+  purchaseDate?: string;
+  batchReference?: string;
+  notes?: string;
+  updatedAt: number;
 }
 
 export type StockMovementReason = 'increase' | 'decrease' | 'restock';
@@ -28,6 +45,7 @@ export interface StockMovement {
 
 export interface Product {
   id: string;
+  status?: ProductPublicationStatus;
   name: string;
   sku?: string;
   category: ProductCategory;
@@ -62,6 +80,12 @@ export interface ProductImage {
 export const totalStock = (product: Product) =>
   product.stock ??
   product.colors.reduce((sum, color) => sum + (color.stock ?? 0), 0);
+
+export const productStatus = (product: Product): ProductPublicationStatus =>
+  product.status ?? 'published';
+
+export const isProductPublished = (product: Product) =>
+  productStatus(product) === 'published';
 
 export const productPriceLabel = (product: Product) => {
   if (product.priceMode === 'on-request') return 'Price on request';

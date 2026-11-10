@@ -2,10 +2,13 @@ import { Injectable, inject } from '@angular/core';
 import {
   addDoc,
   collection,
+  collectionGroup,
   deleteDoc,
+  deleteField,
   doc,
   Firestore,
   getDocs,
+  getDoc,
   getFirestore,
   limit,
   orderBy,
@@ -15,6 +18,8 @@ import {
 } from 'firebase/firestore';
 import {
   Product,
+  ProductPurchasingInfo,
+  ProductPublicationStatus,
   StockMovement,
   StockMovementReason,
   totalStock,
@@ -66,7 +71,32 @@ export class ProductRepository {
   }
 
   async remove(id: string): Promise<void> {
-    if (this.db) await deleteDoc(doc(this.db, 'products', id));
+    if (this.db)
+      await Promise.all([
+        deleteDoc(doc(this.db, 'products', id)),
+        deleteDoc(doc(this.db, 'productPurchasing', id)),
+      ]);
+  }
+
+  async listPurchasingInfo(): Promise<ProductPurchasingInfo[]> {
+    if (!this.db) return [];
+    const snapshot = await getDocs(collection(this.db, 'productPurchasing'));
+    return snapshot.docs.map(
+      (item) => ({ productId: item.id, ...item.data() }) as ProductPurchasingInfo,
+    );
+  }
+
+  async purchasingInfo(productId: string): Promise<ProductPurchasingInfo | null> {
+    if (!this.db) return null;
+    const snapshot = await getDoc(doc(this.db, 'productPurchasing', productId));
+    return snapshot.exists()
+      ? ({ productId, ...snapshot.data() } as ProductPurchasingInfo)
+      : null;
+  }
+
+  async savePurchasingInfo(info: ProductPurchasingInfo): Promise<void> {
+    if (!this.db) return;
+    await setDoc(doc(this.db, 'productPurchasing', info.productId), info);
   }
 
   async adjustStock(
@@ -104,6 +134,55 @@ export class ProductRepository {
     });
   }
 
+  async applyInventoryChange(
+    productId: string,
+    stock: number,
+    status: ProductPublicationStatus,
+    lowStockThreshold: number,
+    price: number,
+  ): Promise<{ product: Product; movement: StockMovement | null }> {
+    if (!this.db) throw new Error('Firebase must be connected to import inventory.');
+    const productRef = doc(this.db, 'products', productId);
+    const movementRef = doc(collection(this.db, 'products', productId, 'stockHistory'));
+    return runTransaction(this.db, async (transaction) => {
+      const snapshot = await transaction.get(productRef);
+      if (!snapshot.exists()) throw new Error('A product in the CSV no longer exists.');
+      const current = { id: snapshot.id, ...snapshot.data() } as Product;
+      const previousStock = totalStock(current);
+      const delta = stock - previousStock;
+      const removeOriginalPrice = Boolean(current.originalPrice && current.originalPrice <= price);
+      transaction.update(productRef, {
+        stock,
+        status,
+        lowStockThreshold,
+        price,
+        ...(removeOriginalPrice ? { originalPrice: deleteField() } : {}),
+      });
+      let movement: StockMovement | null = null;
+      if (delta) {
+        movement = {
+          id: movementRef.id,
+          productId,
+          delta,
+          previousStock,
+          newStock: stock,
+          reason: delta > 0 ? 'restock' : 'decrease',
+          createdAt: Date.now(),
+        };
+        transaction.set(movementRef, movement);
+      }
+      const product: Product = {
+        ...current,
+        stock,
+        status,
+        lowStockThreshold,
+        price,
+      };
+      if (removeOriginalPrice) delete product.originalPrice;
+      return { product, movement };
+    });
+  }
+
   async stockHistory(productId: string): Promise<StockMovement[]> {
     if (!this.db) return [];
     const snapshot = await getDocs(
@@ -111,6 +190,20 @@ export class ProductRepository {
         collection(this.db, 'products', productId, 'stockHistory'),
         orderBy('createdAt', 'desc'),
         limit(30),
+      ),
+    );
+    return snapshot.docs.map(
+      (item) => ({ id: item.id, ...item.data() }) as StockMovement,
+    );
+  }
+
+  async recentStockHistory(): Promise<StockMovement[]> {
+    if (!this.db) return [];
+    const snapshot = await getDocs(
+      query(
+        collectionGroup(this.db, 'stockHistory'),
+        orderBy('createdAt', 'desc'),
+        limit(20),
       ),
     );
     return snapshot.docs.map(

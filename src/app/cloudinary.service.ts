@@ -2,6 +2,8 @@ import { Injectable, inject } from '@angular/core';
 import { environment } from '../environments/environment';
 import { ProductImage } from './product.model';
 import { FirebaseAppService } from './firebase-app.service';
+import { getAuth } from 'firebase/auth';
+import { addDoc, collection, getFirestore } from 'firebase/firestore';
 
 interface CloudinaryResponse {
   secure_url: string;
@@ -38,13 +40,16 @@ export class CloudinaryService {
       if (file.size > this.maximumFileSize)
         throw new Error(`${file.name} is larger than 8 MB.`);
     }
-    if (!this.configured) return this.localPreviews(files, productName);
+    if (!this.configured)
+      throw new Error(
+        'Cloudinary is not configured yet. Images cannot be saved safely.',
+      );
     return Promise.all(
       files.map((file, index) =>
         this.upload(
           file,
           `${productName} ${index + 1}`,
-          'bp-fashion-park/products',
+          'bp_fashion_park/products',
         ),
       ),
     );
@@ -58,24 +63,45 @@ export class CloudinaryService {
       throw new Error(`${file.name} is not a supported image format.`);
     if (file.size > this.maximumFileSize)
       throw new Error(`${file.name} is larger than 8 MB.`);
-    if (!this.configured) return this.localPreviews([file], categoryName)[0];
+    if (!this.configured)
+      throw new Error(
+        'Cloudinary is not configured yet. Category images cannot be saved safely.',
+      );
     return this.upload(
       file,
       `${categoryName} category cover`,
-      'bp-fashion-park/categories',
+      'bp_fashion_park/categories',
     );
   }
 
   async deleteImage(publicId: string): Promise<void> {
     if (!publicId) return;
     if (!this.firebase.app)
-      throw new Error('Firebase is not connected for secure image deletion.');
-    const { getFunctions, httpsCallable } = await import('firebase/functions');
-    const callable = httpsCallable<{ publicId: string }, { deleted: boolean }>(
-      getFunctions(this.firebase.app, 'europe-west1'),
-      'deleteCloudinaryImage',
-    );
-    await callable({ publicId });
+      throw new Error('Firebase is not connected for media cleanup.');
+    const endpoint = environment.cloudinary.deleteEndpoint.trim();
+    if (!endpoint) {
+      await this.queueDeletion(publicId, 'Deletion endpoint not configured');
+      return;
+    }
+    try {
+      const user = getAuth(this.firebase.app).currentUser;
+      if (!user) throw new Error('Owner authentication is required.');
+      const token = await user.getIdToken();
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ publicId }),
+      });
+      if (!response.ok) throw new Error(`Deletion endpoint returned ${response.status}.`);
+    } catch (error) {
+      await this.queueDeletion(
+        publicId,
+        error instanceof Error ? error.message : 'Deletion endpoint failed',
+      );
+    }
   }
 
   async deleteImages(images: ProductImage[]): Promise<void> {
@@ -117,10 +143,16 @@ export class CloudinaryService {
     return { url: result.secure_url, publicId: result.public_id, alt };
   }
 
-  private localPreviews(files: File[], productName: string): ProductImage[] {
-    return files.map((file, index) => ({
-      url: URL.createObjectURL(file),
-      alt: `${productName || 'Product'} ${index + 1}`,
-    }));
+  private async queueDeletion(publicId: string, reason: string): Promise<void> {
+    if (!this.firebase.app)
+      throw new Error('Firebase is not connected for media cleanup.');
+    const now = Date.now();
+    await addDoc(collection(getFirestore(this.firebase.app), 'mediaCleanup'), {
+      publicId,
+      status: 'pending',
+      reason: reason.slice(0, 300),
+      createdAt: now,
+      updatedAt: now,
+    });
   }
 }

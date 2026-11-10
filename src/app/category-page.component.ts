@@ -55,7 +55,7 @@ export class CategoryPageComponent implements OnInit {
       ...this.categoryStore.descendants(category.id).map((item) => item.id),
     ]);
     return this.productStore
-      .products()
+      .publicProducts()
       .filter((product) => ids.has(product.category));
   });
   readonly stockOf = totalStock;
@@ -101,7 +101,7 @@ export class CategoryPageComponent implements OnInit {
     return this.categoryStore.url(id);
   }
   openProduct(id: string): void {
-    const product = this.productStore.find(id);
+    const product = this.productStore.findPublic(id);
     if (product)
       this.router.navigateByUrl(
         this.categoryStore.productUrl(product.category, product.id),

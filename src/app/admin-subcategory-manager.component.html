@@ -35,10 +35,13 @@
         </label>
       </header>
       <div class="subcategory-list">
+        <div class="subcategory-list-head" aria-hidden="true">
+          <span>Located under</span><span>Subcategory</span><span>Products</span><span>Actions</span>
+        </div>
         @for (category of subcategories(); track category.id) {
           <article [class.inactive]="!category.active">
             <div class="subcategory-name">
-              <small>{{ categoryStore.pathLabel(category.id) }}</small>
+              <small><b>Parent</b>{{ categoryStore.pathLabel(category.parentCategoryId!) }}</small>
               <strong>{{ category.name }}</strong>
               <span>{{ productCount(category) }} products</span>
             </div>

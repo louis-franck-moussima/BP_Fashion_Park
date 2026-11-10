@@ -14,7 +14,8 @@ export const environment = {
     recaptchaEnterpriseSiteKey: '',
   },
   cloudinary: {
-    cloudName: '',
-    uploadPreset: '',
+    cloudName: 'ncxdevit',
+    uploadPreset: 'bp_fashion_park',
+    deleteEndpoint: '',
   },
 };

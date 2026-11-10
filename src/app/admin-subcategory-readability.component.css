@@ -1,0 +1,39 @@
+.subcategory-list-head {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) minmax(120px, 0.7fr) 70px 190px;
+  gap: 16px;
+  align-items: center;
+  padding: 10px 4px;
+  border-bottom: 1px solid #ded6cf;
+  color: #756a62;
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.13em;
+}
+
+.subcategory-list-head span:last-child { text-align: right; }
+
+.subcategory-name small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #514841;
+  font-size: 10px;
+  line-height: 1.35;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.subcategory-name small b {
+  color: #a45b3e;
+  font-size: 7px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.subcategory-name strong { font-size: 14px; }
+
+@media (max-width: 950px) {
+  .subcategory-list-head { display: none; }
+}

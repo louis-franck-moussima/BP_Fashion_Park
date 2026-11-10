@@ -38,12 +38,13 @@ service cloud.firestore {
           'id', 'name', 'sku', 'category', 'price', 'art', 'description', 'images', 'colors', 'createdAt'
         ])
         && request.resource.data.keys().hasOnly([
-          'id', 'name', 'sku', 'category', 'price', 'originalPrice', 'priceMode', 'negotiable', 'stock', 'lowStockThreshold', 'art',
+          'id', 'name', 'sku', 'status', 'category', 'price', 'originalPrice', 'priceMode', 'negotiable', 'stock', 'lowStockThreshold', 'art',
           'description', 'images', 'colors', 'sizes', 'audiences', 'ageRange', 'tags',
           'featured', 'newArrival', 'limitedQuantity', 'relatedProductIds', 'wigDetails', 'createdAt'
         ])
         && data.id is string && data.id == productId && data.id.size() <= 160
         && data.name is string && data.name.size() >= 2 && data.name.size() <= 100
+        && (!('status' in data) || data.status in ['draft', 'published', 'hidden', 'archived'])
         && data.sku is string && data.sku.matches('[A-Za-z0-9][A-Za-z0-9._-]{1,39}')
         && data.category is string
         && existsAfter(/databases/$(database)/documents/categories/$(data.category))
@@ -78,7 +79,7 @@ service cloud.firestore {
     function validCustomerRequest(requestId) {
       let data = request.resource.data;
       return data.keys().hasAll(['id', 'reference', 'name', 'phone', 'city', 'message', 'items', 'status', 'createdAt', 'updatedAt'])
-        && data.keys().hasOnly(['id', 'reference', 'name', 'phone', 'city', 'message', 'items', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'reference', 'name', 'phone', 'city', 'message', 'items', 'status', 'ownerNotes', 'followUpAt', 'createdAt', 'updatedAt'])
         && data.id == requestId
         && data.reference is string && data.reference.matches('BP-[0-9]{4}-[A-Za-z0-9]{6}')
         && data.name is string && data.name.size() >= 2 && data.name.size() <= 80
@@ -87,6 +88,8 @@ service cloud.firestore {
         && data.message is string && data.message.size() <= 500
         && data.items is list && data.items.size() >= 1 && data.items.size() <= 30
         && data.status in ['new', 'contacted', 'confirmed', 'closed']
+        && (!('ownerNotes' in data) || (data.ownerNotes is string && data.ownerNotes.size() <= 2000))
+        && (!('followUpAt' in data) || data.followUpAt == null || (data.followUpAt is number && data.followUpAt > 0))
         && data.createdAt is number && data.createdAt > 0
         && data.updatedAt is number && data.updatedAt >= data.createdAt;
     }
@@ -130,6 +133,48 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /productPurchasing/{productId} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasAll(['productId', 'updatedAt'])
+        && request.resource.data.keys().hasOnly([
+          'productId', 'supplierName', 'supplierContact', 'supplierReference',
+          'purchaseCost', 'purchaseDate', 'batchReference', 'notes', 'updatedAt'
+        ])
+        && request.resource.data.productId == productId
+        && (!('supplierName' in request.resource.data) || (request.resource.data.supplierName is string && request.resource.data.supplierName.size() <= 120))
+        && (!('supplierContact' in request.resource.data) || (request.resource.data.supplierContact is string && request.resource.data.supplierContact.size() <= 200))
+        && (!('supplierReference' in request.resource.data) || (request.resource.data.supplierReference is string && request.resource.data.supplierReference.size() <= 100))
+        && (!('purchaseCost' in request.resource.data) || (request.resource.data.purchaseCost is number && request.resource.data.purchaseCost >= 0 && request.resource.data.purchaseCost <= 1000000))
+        && (!('purchaseDate' in request.resource.data) || (request.resource.data.purchaseDate is string && (request.resource.data.purchaseDate == '' || request.resource.data.purchaseDate.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}'))))
+        && (!('batchReference' in request.resource.data) || (request.resource.data.batchReference is string && request.resource.data.batchReference.size() <= 100))
+        && (!('notes' in request.resource.data) || (request.resource.data.notes is string && request.resource.data.notes.size() <= 2000))
+        && request.resource.data.updatedAt is number && request.resource.data.updatedAt > 0;
+      allow delete: if isAdmin();
+    }
+
+    match /adminActivity/{activityId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasAll([
+          'id', 'type', 'entityType', 'entityId', 'title', 'description', 'createdAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'id', 'type', 'entityType', 'entityId', 'title', 'description', 'createdAt'
+        ])
+        && request.resource.data.id == activityId
+        && request.resource.data.type in [
+          'product_created', 'product_edited', 'stock_adjusted',
+          'product_status_changed', 'category_changed', 'request_status_changed'
+        ]
+        && request.resource.data.entityType in ['product', 'category', 'request']
+        && request.resource.data.entityId is string && request.resource.data.entityId.size() >= 1 && request.resource.data.entityId.size() <= 160
+        && request.resource.data.title is string && request.resource.data.title.size() >= 1 && request.resource.data.title.size() <= 180
+        && request.resource.data.description is string && request.resource.data.description.size() <= 500
+        && request.resource.data.createdAt is number && request.resource.data.createdAt > 0;
+      allow update, delete: if false;
+    }
+
     match /categories/{categoryId} {
       allow read: if true;
       allow create, update: if isAdmin() && validCategory(categoryId);
@@ -139,11 +184,13 @@ service cloud.firestore {
     match /customerRequests/{requestId} {
       allow create: if validCustomerRequest(requestId)
         && request.resource.data.status == 'new'
+        && !('ownerNotes' in request.resource.data)
+        && !('followUpAt' in request.resource.data)
         && request.resource.data.createdAt == request.resource.data.updatedAt;
       allow read: if isAdmin();
       allow update: if isAdmin()
         && validCustomerRequest(requestId)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'ownerNotes', 'followUpAt', 'updatedAt']);
       allow delete: if false;
     }
 
@@ -151,6 +198,25 @@ service cloud.firestore {
       allow read: if true;
       allow create, update: if isAdmin() && validStoreSettings();
       allow delete: if false;
+    }
+
+    match /mediaCleanup/{taskId} {
+      allow read, update, delete: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasAll([
+          'publicId', 'status', 'reason', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'publicId', 'status', 'reason', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.publicId is string
+        && request.resource.data.publicId.size() >= 1
+        && request.resource.data.publicId.size() <= 300
+        && request.resource.data.status == 'pending'
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() <= 300
+        && request.resource.data.createdAt is number
+        && request.resource.data.updatedAt == request.resource.data.createdAt;
     }
 
     match /{document=**} {

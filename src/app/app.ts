@@ -71,7 +71,7 @@ export class App implements OnInit, OnDestroy {
   readonly pendingImages = signal<ProductImage[]>([]);
   readonly uploadingImages = signal(false);
   readonly uploadError = signal('');
-  readonly products = this.store.products;
+  readonly products = this.store.publicProducts;
   readonly isDetailPage = signal(false);
   readonly isAuthPage = signal(false);
   readonly categories = computed(() => this.categoryStore.active());

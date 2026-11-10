@@ -69,4 +69,17 @@ export class CustomerRequestRepository {
       updatedAt: Date.now(),
     });
   }
+
+  async updateFollowUp(
+    id: string,
+    ownerNotes: string,
+    followUpAt: number | null,
+  ): Promise<void> {
+    if (!this.db) throw new Error('Firebase is not connected.');
+    await updateDoc(doc(this.db, 'customerRequests', id), {
+      ownerNotes,
+      followUpAt,
+      updatedAt: Date.now(),
+    });
+  }
 }

@@ -79,4 +79,25 @@ export class CustomerRequestStore {
       ),
     );
   }
+
+  async saveFollowUp(
+    request: CustomerRequest,
+    ownerNotes: string,
+    followUpAt: number | null,
+  ): Promise<void> {
+    const notes = ownerNotes.trim();
+    if (notes.length > 2000)
+      throw new Error('Private notes must not exceed 2,000 characters.');
+    if (followUpAt !== null && (!Number.isFinite(followUpAt) || followUpAt <= 0))
+      throw new Error('Choose a valid follow-up date.');
+    await this.repository.updateFollowUp(request.id, notes, followUpAt);
+    const updatedAt = Date.now();
+    this.requests.update((items) =>
+      items.map((item) =>
+        item.id === request.id
+          ? { ...item, ownerNotes: notes, followUpAt, updatedAt }
+          : item,
+      ),
+    );
+  }
 }

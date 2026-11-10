@@ -41,7 +41,7 @@ export class ProductDetailComponent implements OnInit {
   readonly selectedColor = signal<ProductColor | null>(null);
   readonly selectedSize = signal<string | null>(null);
   readonly product = computed(() => {
-    const product = this.store.find(this.productId());
+    const product = this.store.findPublic(this.productId());
     return product && this.categoryStore.isVisible(product.category)
       ? product
       : undefined;
@@ -62,7 +62,7 @@ export class ProductDetailComponent implements OnInit {
     if (!current) return [];
     if (current.relatedProductIds?.length) {
       return current.relatedProductIds
-        .map((id) => this.store.find(id))
+        .map((id) => this.store.findPublic(id))
         .filter(
           (item) =>
             Boolean(item) && this.categoryStore.isVisible(item!.category),
@@ -74,7 +74,7 @@ export class ProductDetailComponent implements OnInit {
     );
     const currentRoot = this.rootCategory(current.category);
     return this.store
-      .products()
+      .publicProducts()
       .filter(
         (item) =>
           item.id !== current.id && this.categoryStore.isVisible(item.category),
@@ -145,7 +145,7 @@ export class ProductDetailComponent implements OnInit {
     return this.categoryStore.productUrl(categoryId, productId);
   }
   stockOf(id: string): number {
-    const product = this.store.find(id);
+    const product = this.store.findPublic(id);
     return product ? totalStock(product) : 0;
   }
   recommendationReason(categoryId: string): string {

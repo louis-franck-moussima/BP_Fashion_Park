@@ -14,6 +14,8 @@ export function validateProduct(
   const errors: string[] = [];
   if (product.name.length < 2 || product.name.length > 100)
     errors.push('Product name must contain 2–100 characters.');
+  if (!['draft', 'published', 'hidden', 'archived'].includes(product.status ?? 'published'))
+    errors.push('Choose a valid publication status.');
   if (!product.sku || !/^[A-Za-z0-9][A-Za-z0-9._-]{1,39}$/.test(product.sku))
     errors.push(
       'SKU must contain 2–40 letters, numbers, dots, dashes or underscores.',

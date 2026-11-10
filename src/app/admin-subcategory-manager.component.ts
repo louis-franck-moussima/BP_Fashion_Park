@@ -1,17 +1,23 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { CategoryStore } from './category-store.service';
 import { ProductStore } from './product-store.service';
 import { Category } from './category.model';
 import { validateCategory } from './catalog-validation';
+import { AdminActivityService } from './admin-activity.service';
 
 @Component({
   selector: 'app-admin-subcategory-manager',
   templateUrl: './admin-subcategory-manager.component.html',
-  styleUrl: './admin-subcategory-manager.component.css',
+  styleUrls: [
+    './admin-subcategory-manager.component.css',
+    './admin-subcategory-readability.component.css',
+  ],
 })
 export class AdminSubcategoryManagerComponent {
+  readonly searchQuery = input('');
   readonly categoryStore = inject(CategoryStore);
   private readonly productStore = inject(ProductStore);
+  private readonly activity = inject(AdminActivityService);
   readonly editingId = signal<string | null>(null);
   readonly selectedBranch = signal('all');
   readonly error = signal('');
@@ -21,6 +27,7 @@ export class AdminSubcategoryManagerComponent {
   readonly roots = this.categoryStore.roots;
   readonly subcategories = computed(() => {
     const branch = this.selectedBranch();
+    const query = this.searchQuery().trim().toLowerCase();
     return this.categoryStore
       .categories()
       .filter((category) => category.parentCategoryId)
@@ -28,6 +35,13 @@ export class AdminSubcategoryManagerComponent {
         (category) =>
           branch === 'all' ||
           this.categoryStore.path(category.id)[0]?.id === branch,
+      )
+      .filter(
+        (category) =>
+          !query ||
+          `${category.name} ${category.description} ${this.categoryStore.pathLabel(category.id)} ${category.active ? 'active visible' : 'inactive hidden'}`
+            .toLowerCase()
+            .includes(query),
       )
       .sort((a, b) => a.displayOrder - b.displayOrder);
   });
@@ -76,6 +90,11 @@ export class AdminSubcategoryManagerComponent {
     this.error.set('');
     try {
       await this.categoryStore.save(category);
+      void this.activity.record({
+        type: 'category_changed', entityType: 'category', entityId: category.id,
+        title: `${existing ? 'Edited' : 'Created'} ${category.name}`,
+        description: `Subcategory saved in ${this.categoryStore.pathLabel(category.id)}.`,
+      }).catch(() => this.error.set('Subcategory saved, but activity history could not be updated.'));
       form.reset();
       this.editingId.set(null);
       this.notice.set(`Subcategory “${category.name}” saved.`);
@@ -113,6 +132,11 @@ export class AdminSubcategoryManagerComponent {
   async toggle(category: Category): Promise<void> {
     try {
       await this.categoryStore.save({ ...category, active: !category.active });
+      void this.activity.record({
+        type: 'category_changed', entityType: 'category', entityId: category.id,
+        title: `${category.name} ${category.active ? 'hidden' : 'shown'}`,
+        description: 'Subcategory storefront visibility changed.',
+      }).catch(() => this.error.set('Visibility changed, but activity history could not be updated.'));
       this.notice.set(
         `${category.name} is now ${category.active ? 'hidden' : 'visible'}.`,
       );

@@ -14,10 +14,13 @@ import { ProductStore } from './product-store.service';
 import {
   PriceMode,
   Product,
+  ProductPublicationStatus,
   ProductImage,
+  ProductPurchasingInfo,
   StockMovement,
   StockMovementReason,
   totalStock,
+  productStatus,
 } from './product.model';
 import { CloudinaryService } from './cloudinary.service';
 import { Category } from './category.model';
@@ -30,14 +33,32 @@ import {
 import { StoreSettingsService } from './store-settings.service';
 import { StoreSettings } from './store-settings.model';
 import { AdminSubcategoryManagerComponent } from './admin-subcategory-manager.component';
+import {
+  InventoryCsvPreview,
+  InventoryCsvService,
+} from './inventory-csv.service';
+import { AdminActivityService } from './admin-activity.service';
+import { AdminActivityType, NewAdminActivity } from './admin-activity.model';
 
 type AdminSection =
   | 'overview'
   | 'products'
+  | 'inventory'
   | 'categories'
   | 'subcategories'
   | 'requests'
+  | 'activity'
   | 'settings';
+
+type InventoryFilter =
+  | 'all'
+  | 'restock'
+  | 'low'
+  | 'out'
+  | 'draft'
+  | 'hidden'
+  | 'archived'
+  | 'incomplete';
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -48,6 +69,15 @@ type AdminSection =
     './admin-dashboard-editor.component.css',
     './admin-category-form.component.css',
     './admin-category-visibility.component.css',
+    './admin-sidebar-nav.component.css',
+    './admin-search.component.css',
+    './admin-inventory.component.css',
+    './admin-inventory-csv.component.css',
+    './admin-request-followup.component.css',
+    './admin-request-layout.component.css',
+    './admin-dashboard-actions.component.css',
+    './admin-purchasing.component.css',
+    './admin-activity.component.css',
   ],
 })
 export class AdminDashboardComponent implements OnInit {
@@ -56,18 +86,22 @@ export class AdminDashboardComponent implements OnInit {
   readonly categoryStore = inject(CategoryStore);
   readonly requestStore = inject(CustomerRequestStore);
   readonly storeSettings = inject(StoreSettingsService);
+  readonly activity = inject(AdminActivityService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly cloudinary = inject(CloudinaryService);
+  private readonly inventoryCsv = inject(InventoryCsvService);
   readonly section = signal<AdminSection>('overview');
   readonly sectionTitle = computed(
     () =>
       ({
         overview: 'Dashboard',
         products: 'Products',
+        inventory: 'Inventory',
         categories: 'Categories',
         subcategories: 'Subcategories',
         requests: 'Customer requests',
+        activity: 'Activity history',
         settings: 'Store settings',
       })[this.section()],
   );
@@ -77,6 +111,8 @@ export class AdminDashboardComponent implements OnInit {
         .length,
   );
   readonly products = this.productStore.products;
+  readonly adminSearch = signal('');
+  readonly searchPanelOpen = signal(false);
   readonly totalUnits = computed(() =>
     this.products().reduce((sum, product) => sum + totalStock(product), 0),
   );
@@ -111,8 +147,27 @@ export class AdminDashboardComponent implements OnInit {
   readonly formError = signal('');
   readonly inventoryError = signal('');
   readonly stockActionId = signal<string | null>(null);
+  readonly inventoryFilter = signal<InventoryFilter>('all');
+  readonly csvPreview = signal<InventoryCsvPreview | null>(null);
+  readonly csvReading = signal(false);
+  readonly csvApplying = signal(false);
   readonly requestActionId = signal<string | null>(null);
   readonly requestError = signal('');
+  readonly requestSearch = signal('');
+  readonly requestStatusFilter = signal<'all' | CustomerRequestStatus>('all');
+  readonly expandedRequestId = signal<string | null>(null);
+  readonly followUpSavingId = signal<string | null>(null);
+  readonly filteredRequests = computed(() => {
+    const query = this.requestSearch().trim().toLowerCase();
+    const status = this.requestStatusFilter();
+    return this.requestStore.requests().filter((request) => {
+      if (status !== 'all' && request.status !== status) return false;
+      if (!query) return true;
+      return `${request.reference} ${request.name} ${request.phone} ${request.city} ${request.message} ${request.ownerNotes ?? ''}`
+        .toLowerCase()
+        .includes(query);
+    });
+  });
   readonly categoryError = signal('');
   readonly pendingCategoryImage = signal<ProductImage | null>(null);
   readonly categoryImageToDelete = signal<ProductImage | null>(null);
@@ -128,6 +183,66 @@ export class AdminDashboardComponent implements OnInit {
   );
   readonly mainCategories = computed(() =>
     this.allCategories().filter((category) => !category.parentCategoryId),
+  );
+  readonly searchedProducts = computed(() => {
+    const query = this.adminSearch().trim().toLowerCase();
+    if (!query) return this.products();
+    return this.products().filter((product) => {
+      const stock = totalStock(product);
+      const stockLabel = stock === 0
+        ? 'out of stock unavailable sold out'
+        : this.isLowStock(product)
+          ? 'low stock limited available'
+          : 'in stock available';
+      return [
+        product.name, product.sku, product.description,
+        ...Object.values(this.productStore.purchasingInfo()[product.id] ?? {}),
+        this.categoryStore.pathLabel(product.category),
+        ...product.colors.map((color) => `${color.name} ${color.hex}`),
+        ...(product.sizes ?? []), ...(product.tags ?? []),
+        ...(product.audiences ?? []), product.ageRange,
+        stockLabel, productStatus(product), String(stock),
+      ].filter(Boolean).join(' ').toLowerCase().includes(query);
+    });
+  });
+  readonly searchedCategories = computed(() => {
+    const query = this.adminSearch().trim().toLowerCase();
+    const categories = this.categoryStore.categories();
+    if (!query) return categories;
+    return categories.filter((category) =>
+      `${category.name} ${category.description} ${this.categoryStore.pathLabel(category.id)} ${category.active ? 'active visible' : 'inactive hidden'}`
+        .toLowerCase().includes(query),
+    );
+  });
+  readonly searchedMainCategories = computed(() =>
+    this.searchedCategories().filter((category) => !category.parentCategoryId),
+  );
+  readonly inventoryProducts = computed(() =>
+    this.searchedProducts().filter((product) => {
+      const filter = this.inventoryFilter();
+      if (filter === 'restock')
+        return totalStock(product) === 0 || this.isLowStock(product);
+      if (filter === 'low') return this.isLowStock(product);
+      if (filter === 'out') return totalStock(product) === 0;
+      if (filter === 'incomplete')
+        return !product.sku || !product.images.length || product.description.length < 20;
+      if (['draft', 'hidden', 'archived'].includes(filter))
+        return productStatus(product) === filter;
+      return true;
+    }),
+  );
+  readonly incompleteProductCount = computed(() =>
+    this.products().filter(
+      (product) => !product.sku || !product.images.length || product.description.length < 20,
+    ).length,
+  );
+  readonly restockProductCount = computed(() =>
+    this.products().filter(
+      (product) => totalStock(product) === 0 || this.isLowStock(product),
+    ).length,
+  );
+  readonly hiddenProductCount = computed(() =>
+    this.products().filter((product) => productStatus(product) === 'hidden').length,
   );
   readonly subcategoryCount = computed(
     () =>
@@ -160,7 +275,7 @@ export class AdminDashboardComponent implements OnInit {
       const requested = params.get('section') as AdminSection | null;
       if (
         requested &&
-        ['overview', 'products', 'categories', 'subcategories', 'requests', 'settings'].includes(requested)
+        ['overview', 'products', 'inventory', 'categories', 'subcategories', 'requests', 'activity', 'settings'].includes(requested)
       )
         this.section.set(requested);
     });
@@ -175,11 +290,59 @@ export class AdminDashboardComponent implements OnInit {
     });
   }
 
+  openInventoryFilter(filter: InventoryFilter): void {
+    this.inventoryFilter.set(filter);
+    this.adminSearch.set('');
+    this.selectSection('inventory');
+  }
+
+  openNewRequests(): void {
+    this.requestStatusFilter.set('new');
+    this.selectSection('requests');
+  }
+
+  stockProductName(productId: string): string {
+    return this.productStore.find(productId)?.name ?? 'Deleted product';
+  }
+
+  openStockMovement(movement: StockMovement): void {
+    const product = this.productStore.find(movement.productId);
+    this.inventoryFilter.set('all');
+    this.adminSearch.set(product?.sku || product?.name || '');
+    this.selectSection('inventory');
+  }
+
+  openProductResult(product: Product): void {
+    this.searchPanelOpen.set(false);
+    this.selectSection('products');
+    if (typeof document !== 'undefined')
+      setTimeout(() =>
+        document.getElementById(`admin-product-${product.id}`)?.scrollIntoView({
+          behavior: 'smooth', block: 'center',
+        }),
+      );
+  }
+
+  openCategoryResult(category: Category): void {
+    this.searchPanelOpen.set(false);
+    this.selectSection(category.parentCategoryId ? 'subcategories' : 'categories');
+  }
+
+  clearAdminSearch(): void {
+    this.adminSearch.set('');
+    this.searchPanelOpen.set(false);
+  }
+
   async ngOnInit(): Promise<void> {
     await Promise.all([
       this.productStore.initialize(),
       this.categoryStore.initialize(),
       this.storeSettings.initialize(),
+    ]);
+    await Promise.all([
+      this.productStore.loadRecentStockHistory(),
+      this.productStore.loadPurchasingInfo(),
+      this.activity.initialize(),
     ]);
   }
   categoryName(id: string): string {
@@ -284,6 +447,7 @@ export class AdminDashboardComponent implements OnInit {
         ...product,
         name: `${product.name} copy`,
         sku: '',
+        status: 'draft',
       }),
     );
   }
@@ -336,9 +500,97 @@ export class AdminDashboardComponent implements OnInit {
         if (this.adminNotice() === message) this.adminNotice.set('');
       }, 5000);
   }
+  private recordActivity(entry: NewAdminActivity): void {
+    void this.activity.record(entry).catch(() =>
+      this.notify(
+        'The change was saved, but its activity entry could not be recorded.',
+        true,
+      ),
+    );
+  }
   isLowStock(product: Product): boolean {
     const stock = totalStock(product);
     return stock > 0 && stock <= (product.lowStockThreshold ?? 3);
+  }
+  publicationStatus(product: Product): ProductPublicationStatus {
+    return productStatus(product);
+  }
+  publicationCount(status: ProductPublicationStatus): number {
+    return this.products().filter((product) => productStatus(product) === status).length;
+  }
+  async setProductStatus(
+    product: Product,
+    status: ProductPublicationStatus,
+  ): Promise<void> {
+    if (!this.auth.isOwner()) return;
+    this.inventoryError.set('');
+    try {
+      const previousStatus = productStatus(product);
+      await this.productStore.save({ ...product, status });
+      this.recordActivity({
+        type: 'product_status_changed', entityType: 'product', entityId: product.id,
+        title: `${product.name} marked ${status}`,
+        description: `Publication status changed from ${previousStatus} to ${status}.`,
+      });
+      this.notify(`“${product.name}” is now ${status}.`);
+    } catch (error) {
+      this.inventoryError.set(
+        error instanceof Error ? error.message : 'Product status could not be updated.',
+      );
+    }
+  }
+  exportInventoryCsv(): void {
+    if (typeof document === 'undefined') return;
+    this.inventoryCsv.export(this.products(), (id) =>
+      this.categoryStore.pathLabel(id),
+    );
+    this.notify('Inventory CSV exported.');
+  }
+  async previewInventoryCsv(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    this.csvReading.set(true);
+    this.inventoryError.set('');
+    try {
+      this.csvPreview.set(await this.inventoryCsv.parse(file, this.products()));
+    } catch (error) {
+      this.csvPreview.set(null);
+      this.inventoryError.set(
+        error instanceof Error ? error.message : 'The CSV file could not be read.',
+      );
+    } finally {
+      this.csvReading.set(false);
+      input.value = '';
+    }
+  }
+  async applyInventoryCsv(): Promise<void> {
+    const preview = this.csvPreview();
+    if (!preview || preview.errors.length || !preview.changes.length || !this.auth.isOwner())
+      return;
+    this.csvApplying.set(true);
+    this.inventoryError.set('');
+    let completed = 0;
+    try {
+      for (const change of preview.changes) {
+        await this.productStore.applyInventoryChange(
+          change.product.id,
+          change.stock,
+          change.status,
+          change.lowStockThreshold,
+          change.price,
+        );
+        completed++;
+      }
+      this.csvPreview.set(null);
+      this.notify(`${completed} inventory ${completed === 1 ? 'item' : 'items'} updated from CSV.`);
+    } catch (error) {
+      this.inventoryError.set(
+        `${completed} rows were applied before the import stopped. ${error instanceof Error ? error.message : 'Import failed.'}`,
+      );
+    } finally {
+      this.csvApplying.set(false);
+    }
   }
   async adjustStock(
     product: Product,
@@ -351,6 +603,11 @@ export class AdminDashboardComponent implements OnInit {
     this.inventoryError.set('');
     try {
       await this.productStore.adjustStock(product.id, delta, reason);
+      this.recordActivity({
+        type: 'stock_adjusted', entityType: 'product', entityId: product.id,
+        title: `Stock changed for ${product.name}`,
+        description: `${delta > 0 ? '+' : ''}${delta} units · ${totalStock(product)} to ${totalStock(product) + delta}.`,
+      });
       this.notify(`Stock for “${product.name}” updated.`);
     } catch (error) {
       this.inventoryError.set(
@@ -389,6 +646,16 @@ export class AdminDashboardComponent implements OnInit {
       timeStyle: 'short',
     }).format(new Date(timestamp));
   }
+  activityTypeLabel(type: AdminActivityType): string {
+    return ({
+      product_created: 'Product created',
+      product_edited: 'Product edited',
+      stock_adjusted: 'Stock adjusted',
+      product_status_changed: 'Publication changed',
+      category_changed: 'Category changed',
+      request_status_changed: 'Request updated',
+    })[type];
+  }
   async updateRequestStatus(
     request: CustomerRequest,
     status: CustomerRequestStatus,
@@ -398,6 +665,11 @@ export class AdminDashboardComponent implements OnInit {
     this.requestError.set('');
     try {
       await this.requestStore.setStatus(request, status);
+      this.recordActivity({
+        type: 'request_status_changed', entityType: 'request', entityId: request.id,
+        title: `${request.reference} marked ${status}`,
+        description: `Customer request status changed from ${request.status} to ${status}.`,
+      });
       this.notify(`Request ${request.reference} marked ${status}.`);
     } catch (error) {
       this.requestError.set(
@@ -411,6 +683,78 @@ export class AdminDashboardComponent implements OnInit {
   }
   requestDate(timestamp: number): string {
     return this.movementDate(timestamp);
+  }
+  requestStatusCount(status: 'all' | CustomerRequestStatus): number {
+    return status === 'all'
+      ? this.requestStore.requests().length
+      : this.requestStore.requests().filter((request) => request.status === status).length;
+  }
+  toggleRequestDetails(request: CustomerRequest): void {
+    this.expandedRequestId.set(
+      this.expandedRequestId() === request.id ? null : request.id,
+    );
+  }
+  customerWhatsappUrl(request: CustomerRequest): string {
+    const phone = request.phone.replace(/\D/g, '');
+    const message = `Hello ${request.name}, this is BP Fashion Park regarding your request ${request.reference}.`;
+    return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  }
+  customerHistory(request: CustomerRequest): CustomerRequest[] {
+    const phone = request.phone.replace(/\D/g, '');
+    return this.requestStore
+      .requests()
+      .filter(
+        (item) => item.id !== request.id && item.phone.replace(/\D/g, '') === phone,
+      )
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }
+  openPreviousRequest(request: CustomerRequest): void {
+    this.requestStatusFilter.set('all');
+    this.requestSearch.set(request.reference);
+    this.expandedRequestId.set(request.id);
+  }
+  followUpInputValue(request: CustomerRequest): string {
+    if (!request.followUpAt) return '';
+    const date = new Date(request.followUpAt);
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60000)
+      .toISOString()
+      .slice(0, 16);
+  }
+  followUpLabel(timestamp: number): string {
+    return new Intl.DateTimeFormat('en-GB', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(timestamp));
+  }
+  isFollowUpDue(request: CustomerRequest): boolean {
+    return Boolean(
+      request.followUpAt &&
+        request.followUpAt <= Date.now() &&
+        !['confirmed', 'closed'].includes(request.status),
+    );
+  }
+  async saveRequestFollowUp(request: CustomerRequest, event: Event): Promise<void> {
+    event.preventDefault();
+    if (this.followUpSavingId()) return;
+    const data = new FormData(event.target as HTMLFormElement);
+    const rawDate = String(data.get('followUpAt') || '');
+    const followUpAt = rawDate ? new Date(rawDate).getTime() : null;
+    this.followUpSavingId.set(request.id);
+    this.requestError.set('');
+    try {
+      await this.requestStore.saveFollowUp(
+        request,
+        String(data.get('ownerNotes') || ''),
+        followUpAt,
+      );
+      this.notify(`Follow-up details saved for ${request.reference}.`);
+    } catch (error) {
+      this.requestError.set(
+        error instanceof Error ? error.message : 'Follow-up details could not be saved.',
+      );
+    } finally {
+      this.followUpSavingId.set(null);
+    }
   }
   async selectImages(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
@@ -481,8 +825,21 @@ export class AdminDashboardComponent implements OnInit {
       laceType: String(data.get('wigLaceType') || '').trim(),
       density: String(data.get('wigDensity') || '').trim(),
     };
+    const purchaseCost = Number(data.get('purchaseCost'));
+    const purchasingInfo: ProductPurchasingInfo = {
+      productId: existing?.id ?? `product-${Date.now()}`,
+      supplierName: String(data.get('supplierName') || '').trim(),
+      supplierContact: String(data.get('supplierContact') || '').trim(),
+      supplierReference: String(data.get('supplierReference') || '').trim(),
+      ...(purchaseCost > 0 ? { purchaseCost } : {}),
+      purchaseDate: String(data.get('purchaseDate') || ''),
+      batchReference: String(data.get('batchReference') || '').trim(),
+      notes: String(data.get('purchasingNotes') || '').trim(),
+      updatedAt: Date.now(),
+    };
     const product: Product = {
-      id: existing?.id ?? `product-${Date.now()}`,
+      id: purchasingInfo.productId,
+      status: String(data.get('status') || 'draft') as ProductPublicationStatus,
       name: String(data.get('name') || '').trim(),
       sku: String(data.get('sku') || '')
         .trim()
@@ -538,6 +895,19 @@ export class AdminDashboardComponent implements OnInit {
     this.formError.set('');
     try {
       await this.productStore.save(product);
+      await this.productStore.savePurchasingInfo(purchasingInfo);
+      this.recordActivity({
+        type: existing ? 'product_edited' : 'product_created',
+        entityType: 'product', entityId: product.id,
+        title: `${existing ? 'Edited' : 'Created'} ${product.name}`,
+        description: `${product.sku} · ${this.categoryStore.pathLabel(product.category)}.`,
+      });
+      if (existing && productStatus(existing) !== productStatus(product))
+        this.recordActivity({
+          type: 'product_status_changed', entityType: 'product', entityId: product.id,
+          title: `${product.name} marked ${productStatus(product)}`,
+          description: `Publication status changed from ${productStatus(existing)} to ${productStatus(product)}.`,
+        });
       await this.cloudinary.deleteImages(this.removedImages());
       this.productEditorDirty.set(false);
       this.uploadedThisSession.set([]);
@@ -639,6 +1009,11 @@ export class AdminDashboardComponent implements OnInit {
     }
     try {
       await this.categoryStore.save(category);
+      this.recordActivity({
+        type: 'category_changed', entityType: 'category', entityId: category.id,
+        title: `${existing ? 'Edited' : 'Created'} ${category.name}`,
+        description: `${category.parentCategoryId ? 'Subcategory' : 'Category'} saved in ${this.categoryStore.pathLabel(category.id)}.`,
+      });
       if (this.categoryImageToDelete())
         await this.cloudinary.deleteImages([this.categoryImageToDelete()!]);
       form.reset();
@@ -764,8 +1139,14 @@ export class AdminDashboardComponent implements OnInit {
     this.pendingCategoryImage.set(null);
   }
   async toggleCategory(category: Category): Promise<void> {
-    if (this.auth.user())
+    if (this.auth.user()) {
       await this.categoryStore.save({ ...category, active: !category.active });
+      this.recordActivity({
+        type: 'category_changed', entityType: 'category', entityId: category.id,
+        title: `${category.name} ${category.active ? 'hidden' : 'shown'}`,
+        description: 'Category storefront visibility changed.',
+      });
+    }
   }
   async importStarterCategories(): Promise<void> {
     if (!this.auth.user() || this.categoryStore.categories().length) return;
@@ -791,6 +1172,11 @@ export class AdminDashboardComponent implements OnInit {
     if (!this.auth.user()) return;
     try {
       await this.categoryStore.save({ ...category, active });
+      this.recordActivity({
+        type: 'category_changed', entityType: 'category', entityId: category.id,
+        title: `${category.name} ${active ? 'shown' : 'hidden'}`,
+        description: 'Category storefront visibility changed.',
+      });
       this.notify(
         `Category “${category.name}” ${active ? 'shown' : 'hidden'}.`,
       );
@@ -822,6 +1208,11 @@ export class AdminDashboardComponent implements OnInit {
           displayOrder: category.displayOrder,
         }),
       ]);
+      this.recordActivity({
+        type: 'category_changed', entityType: 'category', entityId: category.id,
+        title: `Reordered ${category.name}`,
+        description: `Category moved ${direction < 0 ? 'up' : 'down'} in its branch.`,
+      });
       this.notify(`Category “${category.name}” reordered.`);
     } catch (error) {
       this.categoryError.set(
@@ -906,6 +1297,8 @@ export class AdminDashboardComponent implements OnInit {
     (form.elements.namedItem('name') as HTMLInputElement).value = product.name;
     (form.elements.namedItem('sku') as HTMLInputElement).value =
       product.sku ?? '';
+    (form.elements.namedItem('status') as HTMLSelectElement).value =
+      productStatus(product);
     (form.elements.namedItem('category') as HTMLSelectElement).value =
       product.category;
     (form.elements.namedItem('price') as HTMLInputElement).value = String(
@@ -953,6 +1346,21 @@ export class AdminDashboardComponent implements OnInit {
       product.wigDetails?.laceType ?? '';
     (form.elements.namedItem('wigDensity') as HTMLInputElement).value =
       product.wigDetails?.density ?? '';
+    const purchasing = this.productStore.purchasingInfo()[product.id];
+    (form.elements.namedItem('supplierName') as HTMLInputElement).value =
+      purchasing?.supplierName ?? '';
+    (form.elements.namedItem('supplierContact') as HTMLInputElement).value =
+      purchasing?.supplierContact ?? '';
+    (form.elements.namedItem('supplierReference') as HTMLInputElement).value =
+      purchasing?.supplierReference ?? '';
+    (form.elements.namedItem('purchaseCost') as HTMLInputElement).value =
+      purchasing?.purchaseCost ? String(purchasing.purchaseCost) : '';
+    (form.elements.namedItem('purchaseDate') as HTMLInputElement).value =
+      purchasing?.purchaseDate ?? '';
+    (form.elements.namedItem('batchReference') as HTMLInputElement).value =
+      purchasing?.batchReference ?? '';
+    (form.elements.namedItem('purchasingNotes') as HTMLTextAreaElement).value =
+      purchasing?.notes ?? '';
     const related = new Set(product.relatedProductIds ?? []);
     form
       .querySelectorAll<HTMLInputElement>('input[name="relatedProductIds"]')

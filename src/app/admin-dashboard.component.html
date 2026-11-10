@@ -4,39 +4,39 @@
       ><span>BP</span><small>FASHION PARK</small></a
     >
     <nav aria-label="Admin navigation">
-      <button
-        [class.active]="section() === 'overview'"
-        (click)="selectSection('overview')"
-      >
-        <span>◇</span> Overview</button
-      ><button
-        [class.active]="section() === 'products'"
-        (click)="selectSection('products')"
-      >
-        <span>▦</span> Products <small>{{ products().length }}</small></button
-      ><button
-        [class.active]="section() === 'categories'"
-        (click)="selectSection('categories')"
-      >
-        <span>⌘</span> Categories
-        <small>{{ mainCategories().length }}</small></button
-      ><button
-        [class.active]="section() === 'subcategories'"
-        (click)="selectSection('subcategories')"
-      >
-        <span>↳</span> Subcategories
-        <small>{{ subcategoryCount() }}</small></button
-      ><button
-        [class.active]="section() === 'requests'"
-        (click)="selectSection('requests')"
-      >
-        <span>✉</span> Requests <small>{{ newRequestCount() }}</small></button
-      ><button
-        [class.active]="section() === 'settings'"
-        (click)="selectSection('settings')"
-      >
-        <span>⚙</span> Settings
-      </button>
+      <div class="sidebar-nav-group">
+        <p>Workspace</p>
+        <button [class.active]="section() === 'overview'" (click)="selectSection('overview')">
+          <span>◇</span><b>Overview</b>
+        </button>
+      </div>
+      <div class="sidebar-nav-group catalog-group">
+        <p>Catalog</p>
+        <button [class.active]="section() === 'products'" (click)="selectSection('products')">
+          <span>▦</span><b>Products</b><small>{{ products().length }}</small>
+        </button>
+        <button [class.active]="section() === 'inventory'" (click)="selectSection('inventory')">
+          <span>≣</span><b>Inventory</b><small>{{ lowStock().length + outOfStock().length }}</small>
+        </button>
+        <button [class.active]="section() === 'categories'" (click)="selectSection('categories')">
+          <span>C</span><b>Categories</b><small>{{ mainCategories().length }}</small>
+        </button>
+        <button class="nested-nav" [class.active]="section() === 'subcategories'" (click)="selectSection('subcategories')">
+          <span>S</span><b>Subcategories</b><small>{{ subcategoryCount() }}</small>
+        </button>
+      </div>
+      <div class="sidebar-nav-group">
+        <p>Operations</p>
+        <button [class.active]="section() === 'requests'" (click)="selectSection('requests')">
+          <span>✉</span><b>Requests</b><small>{{ newRequestCount() }}</small>
+        </button>
+        <button [class.active]="section() === 'activity'" (click)="selectSection('activity')">
+          <span>◷</span><b>Activity</b><small>{{ activity.activities().length }}</small>
+        </button>
+        <button [class.active]="section() === 'settings'" (click)="selectSection('settings')">
+          <span>⚙</span><b>Store settings</b>
+        </button>
+      </div>
     </nav>
     <div class="sidebar-bottom">
       <a routerLink="/">View storefront</a>
@@ -53,6 +53,14 @@
         <p>BP Fashion Park</p>
         <h1>{{ sectionTitle() }}</h1>
       </div>
+      <label class="admin-global-search">
+        <span class="sr-only">Search the admin catalog</span><i aria-hidden="true">⌕</i>
+        <input type="search" placeholder="Search products, SKU, stock, colors, categories…"
+          [value]="adminSearch()" (focus)="searchPanelOpen.set(true)"
+          (input)="adminSearch.set($any($event.target).value); searchPanelOpen.set(true)"
+          (keydown.escape)="searchPanelOpen.set(false)" />
+        @if (adminSearch()) { <button type="button" (click)="clearAdminSearch()" aria-label="Clear admin search">×</button> }
+      </label>
       <div
         class="admin-status"
         [class.connected]="productStore.firebaseConfigured"
@@ -63,6 +71,23 @@
         }}</span>
       </div>
     </header>
+    @if (adminSearch().trim() && searchPanelOpen()) {
+      <section class="admin-search-results" aria-label="Admin search results">
+        <header><span>Search results</span><p>{{ searchedProducts().length }} products · {{ searchedCategories().length }} catalog groups</p><button (click)="searchPanelOpen.set(false)" aria-label="Close search results">×</button></header>
+        <div class="admin-search-columns">
+          <div><h2>Products</h2>
+            @for (product of searchedProducts().slice(0, 6); track product.id) {
+              <button class="admin-search-result" (click)="openProductResult(product)"><span><strong>{{ product.name }}</strong><small>{{ product.sku || categoryName(product.category) }}</small></span><b [class.out]="stockOf(product) === 0">{{ stockOf(product) === 0 ? "Out of stock" : stockOf(product) + " units" }}</b></button>
+            } @empty { <p class="admin-search-empty">No matching products</p> }
+          </div>
+          <div><h2>Categories & subcategories</h2>
+            @for (category of searchedCategories().slice(0, 8); track category.id) {
+              <button class="admin-search-result" (click)="openCategoryResult(category)"><span><strong>{{ category.name }}</strong><small>{{ categoryStore.pathLabel(category.id) }}</small></span><b>{{ category.parentCategoryId ? "Subcategory" : "Category" }}</b></button>
+            } @empty { <p class="admin-search-empty">No matching categories</p> }
+          </div>
+        </div>
+      </section>
+    }
     @if (adminNotice()) {
       <div
         class="admin-notice"
@@ -135,28 +160,61 @@
     }
 
     @if (section() === "overview") {
-      <div class="metric-grid">
-        <article>
-          <span>Products</span><strong>{{ products().length }}</strong
-          ><small
-            >Across {{ categoryStore.active().length }} visible
-            categories</small
-          >
-        </article>
-        <article>
-          <span>Units in stock</span><strong>{{ totalUnits() }}</strong
-          ><small>{{ lowStock().length }} low-stock products</small>
-        </article>
-        <article>
-          <span>Out of stock</span><strong>{{ outOfStock().length }}</strong
-          ><small>Require inventory attention</small>
-        </article>
-        <article>
-          <span>Inventory value</span
-          ><strong>{{ inventoryValueLabel() }}</strong
-          ><small>Estimated at retail price</small>
-        </article>
-      </div>
+      <section class="dashboard-action-grid" aria-label="Store actions">
+        <button class="dashboard-action-card urgent" (click)="openInventoryFilter('restock')">
+          <span>Inventory attention</span>
+          <strong>{{ restockProductCount() }}</strong>
+          <p>{{ restockProductCount() === 1 ? "product needs" : "products need" }} restocking.</p>
+          <small>Review stock</small>
+        </button>
+        <button class="dashboard-action-card request" (click)="openNewRequests()">
+          <span>Customer enquiries</span>
+          <strong>{{ newRequestCount() }}</strong>
+          <p>{{ newRequestCount() === 1 ? "new customer request" : "new customer requests" }}.</p>
+          <small>Open requests</small>
+        </button>
+        <button class="dashboard-action-card" (click)="openInventoryFilter('hidden')">
+          <span>Store visibility</span>
+          <strong>{{ hiddenProductCount() }}</strong>
+          <p>{{ hiddenProductCount() === 1 ? "product is" : "products are" }} hidden.</p>
+          <small>Review visibility</small>
+        </button>
+        <button class="dashboard-action-card" (click)="openInventoryFilter('incomplete')">
+          <span>Catalog quality</span>
+          <strong>{{ incompleteProductCount() }}</strong>
+          <p>{{ incompleteProductCount() === 1 ? "product has" : "products have" }} incomplete information.</p>
+          <small>Complete products</small>
+        </button>
+      </section>
+
+      <section class="admin-panel-block stock-activity-block">
+        <div class="block-heading">
+          <div>
+            <span>Inventory activity</span>
+            <h2>Recently changed stock</h2>
+          </div>
+          <button (click)="selectSection('inventory')">Open inventory</button>
+        </div>
+        @if (productStore.recentStockChanges().length) {
+          <div class="stock-activity-list">
+            @for (movement of productStore.recentStockChanges().slice(0, 6); track movement.id) {
+              <button (click)="openStockMovement(movement)">
+                <span class="stock-activity-product">
+                  <strong>{{ stockProductName(movement.productId) }}</strong>
+                  <small>{{ movementLabel(movement) }} · {{ movementDate(movement.createdAt) }}</small>
+                </span>
+                <b [class.negative]="movement.delta < 0">{{ movement.delta > 0 ? "+" : "" }}{{ movement.delta }}</b>
+                <span class="stock-activity-total">{{ movement.previousStock }} to {{ movement.newStock }}</span>
+              </button>
+            }
+          </div>
+        } @else {
+          <div class="dashboard-empty-activity">
+            <strong>No stock changes yet.</strong>
+            <p>Adjustments made from Inventory will appear here.</p>
+          </div>
+        }
+      </section>
       <section class="admin-panel-block">
         <div class="block-heading">
           <div>
@@ -228,8 +286,8 @@
             <span>Product</span><span>Category</span><span>Price</span
             ><span>Stock</span><span>Actions</span>
           </div>
-          @for (product of products(); track product.id) {
-            <div class="table-row">
+          @for (product of searchedProducts(); track product.id) {
+            <div class="table-row" [id]="'admin-product-' + product.id">
               <span class="product-cell">
                 @if (product.images.length) {
                   <img [src]="product.images[0].url" [alt]="product.name" />
@@ -282,6 +340,58 @@
               >
             </div>
           }
+        </div>
+      </section>
+    }
+
+    @if (section() === "inventory") {
+      <section class="admin-panel-block inventory-center">
+        <div class="block-heading">
+          <div><span>Stock and publication</span><h2>Inventory action centre</h2></div>
+          <div class="inventory-csv-actions">
+            <button type="button" (click)="exportInventoryCsv()">Export CSV</button>
+            <label>{{ csvReading() ? "Reading…" : "Import CSV" }}<input type="file" accept=".csv,text/csv" (change)="previewInventoryCsv($event)" [disabled]="csvReading() || csvApplying()" /></label>
+          </div>
+        </div>
+        <div class="inventory-summary">
+          <button [class.active]="inventoryFilter() === 'all'" (click)="inventoryFilter.set('all')"><strong>{{ products().length }}</strong><span>All products</span></button>
+          <button [class.active]="inventoryFilter() === 'low'" (click)="inventoryFilter.set('low')"><strong>{{ lowStock().length }}</strong><span>Low stock</span></button>
+          <button [class.active]="inventoryFilter() === 'out'" (click)="inventoryFilter.set('out')"><strong>{{ outOfStock().length }}</strong><span>Out of stock</span></button>
+          <button [class.active]="inventoryFilter() === 'draft'" (click)="inventoryFilter.set('draft')"><strong>{{ publicationCount('draft') }}</strong><span>Drafts</span></button>
+          <button [class.active]="inventoryFilter() === 'hidden'" (click)="inventoryFilter.set('hidden')"><strong>{{ publicationCount('hidden') }}</strong><span>Hidden</span></button>
+          <button [class.active]="inventoryFilter() === 'archived'" (click)="inventoryFilter.set('archived')"><strong>{{ publicationCount('archived') }}</strong><span>Archived</span></button>
+          <button [class.active]="inventoryFilter() === 'incomplete'" (click)="inventoryFilter.set('incomplete')"><strong>{{ incompleteProductCount() }}</strong><span>Incomplete</span></button>
+        </div>
+        @if (csvPreview(); as preview) {
+          <section class="csv-preview" [class.has-errors]="preview.errors.length">
+            <header><div><span>Import preview</span><strong>{{ preview.fileName }}</strong></div><button (click)="csvPreview.set(null)" aria-label="Close CSV preview">×</button></header>
+            <div class="csv-preview-summary"><p><strong>{{ preview.changes.length }}</strong><span>Changes ready</span></p><p><strong>{{ preview.unchanged }}</strong><span>Unchanged rows</span></p><p><strong>{{ preview.errors.length }}</strong><span>Errors</span></p></div>
+            @if (preview.changes.length) {
+              <div class="csv-change-list">
+                @for (change of preview.changes.slice(0, 12); track change.product.id) {
+                  <p><strong>{{ change.product.sku }}</strong><span>{{ change.product.name }}</span><small>{{ change.changedFields.join(", ") }}</small></p>
+                }
+                @if (preview.changes.length > 12) { <small>And {{ preview.changes.length - 12 }} more changes…</small> }
+              </div>
+            }
+            @if (preview.errors.length) {
+              <div class="csv-errors" role="alert">@for (error of preview.errors.slice(0, 15); track error) { <p>{{ error }}</p> }@if (preview.errors.length > 15) { <p>And {{ preview.errors.length - 15 }} more errors…</p> }</div>
+            }
+            <footer><small>Nothing is changed until you apply this preview. Fix every error before importing.</small><button (click)="applyInventoryCsv()" [disabled]="preview.errors.length || !preview.changes.length || csvApplying()">{{ csvApplying() ? "Applying…" : "Apply CSV changes" }}</button></footer>
+          </section>
+        }
+        @if (inventoryError()) { <p class="dashboard-error">{{ inventoryError() }}</p> }
+        <div class="inventory-table">
+          <div class="inventory-row inventory-head"><span>Product</span><span>Category</span><span>Publication</span><span>Stock</span><span>Quick actions</span></div>
+          @for (product of inventoryProducts(); track product.id) {
+            <article class="inventory-row">
+              <span class="product-cell">@if (product.images.length) { <img [src]="product.images[0].url" [alt]="product.name" /> } @else { <i>{{ product.name.charAt(0) }}</i> }<strong>{{ product.name }}<small>{{ product.sku || "Missing SKU" }}</small></strong></span>
+              <span>{{ categoryStore.pathLabel(product.category) }}</span>
+              <label><span class="sr-only">Publication status for {{ product.name }}</span><select [value]="publicationStatus(product)" (change)="setProductStatus(product, $any($event.target).value)"><option value="draft">Draft</option><option value="published">Published</option><option value="hidden">Hidden</option><option value="archived">Archived</option></select></label>
+              <span class="inventory-stock"><strong>{{ stockOf(product) }}</strong><small>{{ stockOf(product) === 0 ? "Out of stock" : isLowStock(product) ? "Low stock" : "Available" }}</small></span>
+              <span class="inventory-actions"><button (click)="adjustStock(product, -1, 'decrease')" [disabled]="stockActionId() || stockOf(product) === 0">−1</button><button (click)="adjustStock(product, 1, 'increase')" [disabled]="stockActionId()">+1</button><button (click)="restockProduct(product)" [disabled]="stockActionId()">Restock</button><button (click)="editProduct(product)">Edit</button></span>
+            </article>
+          } @empty { <div class="inventory-empty"><strong>No products match this view</strong><p>Try another inventory filter or clear the global search.</p></div> }
         </div>
       </section>
     }
@@ -359,7 +469,7 @@
           <p class="dashboard-error">{{ categoryError() }}</p>
         }
         <div class="category-admin-list">
-          @for (category of mainCategories(); track category.id) {
+          @for (category of searchedMainCategories(); track category.id) {
             <article
               [class.hidden-category]="!category.active"
               [style.--depth]="categoryDepth(category.id)"
@@ -419,7 +529,7 @@
       </section>
     }
     @if (section() === "subcategories") {
-      <app-admin-subcategory-manager />
+      <app-admin-subcategory-manager [searchQuery]="adminSearch()" />
     }
     @if (section() === "requests") {
       <section class="admin-panel-block request-admin-panel">
@@ -427,6 +537,14 @@
           <div>
             <span>Customer enquiries</span>
             <h2>Availability requests</h2>
+          </div>
+        </div>
+        <div class="request-tools">
+          <label><span class="sr-only">Search customer requests</span><input type="search" placeholder="Search name, phone, city or reference…" [value]="requestSearch()" (input)="requestSearch.set($any($event.target).value)" /></label>
+          <div role="group" aria-label="Filter requests by status">
+            @for (status of ['all', 'new', 'contacted', 'confirmed', 'closed']; track status) {
+              <button [class.active]="requestStatusFilter() === status" (click)="requestStatusFilter.set($any(status))">{{ status }} <small>{{ requestStatusCount($any(status)) }}</small></button>
+            }
           </div>
         </div>
         @if (requestStore.loading()) {
@@ -444,8 +562,8 @@
           </p>
         }
         <div class="request-admin-list">
-          @for (request of requestStore.requests(); track request.id) {
-            <article>
+          @for (request of filteredRequests(); track request.id) {
+            <article [class.follow-up-due]="isFollowUpDue(request)">
               <header>
                 <div>
                   <span>{{ request.reference }}</span
@@ -455,6 +573,9 @@
                     {{ request.phone }}</small
                   >
                 </div>
+                <div class="request-header-actions">
+                <a [href]="customerWhatsappUrl(request)" target="_blank" rel="noopener">WhatsApp</a>
+                <button (click)="toggleRequestDetails(request)">{{ expandedRequestId() === request.id ? "Close" : "Follow up" }}</button>
                 <select
                   [value]="request.status"
                   (change)="
@@ -466,8 +587,11 @@
                   <option value="contacted">Contacted</option>
                   <option value="confirmed">Confirmed</option>
                   <option value="closed">Closed</option>
-                </select>
+                </select></div>
               </header>
+              @if (request.followUpAt) {
+                <p class="follow-up-label" [class.due]="isFollowUpDue(request)">{{ isFollowUpDue(request) ? "Follow-up due" : "Next follow-up" }} · {{ followUpLabel(request.followUpAt) }}</p>
+              }
               @if (request.message) {
                 <p>{{ request.message }}</p>
               }
@@ -486,6 +610,21 @@
                   >
                 }
               </div>
+              @if (expandedRequestId() === request.id) {
+                <div class="request-follow-up-grid">
+                  <form (submit)="saveRequestFollowUp(request, $event)">
+                    <label>Private owner notes<textarea name="ownerNotes" rows="5" maxlength="2000" [value]="request.ownerNotes || ''" placeholder="What was discussed? Preferences, delivery details, next action…"></textarea></label>
+                    <label>Next follow-up<input name="followUpAt" type="datetime-local" [value]="followUpInputValue(request)" /></label>
+                    <small>These notes are private and never shown to the customer.</small>
+                    <button type="submit" [disabled]="followUpSavingId() === request.id">{{ followUpSavingId() === request.id ? "Saving…" : "Save follow-up" }}</button>
+                  </form>
+                  <section class="customer-history"><div><span>Returning customer history</span><strong>{{ customerHistory(request).length }} previous requests</strong></div>
+                    @for (previous of customerHistory(request); track previous.id) {
+                      <button (click)="openPreviousRequest(previous)"><span><b>{{ previous.reference }}</b><small>{{ requestDate(previous.createdAt) }}</small></span><em>{{ previous.status }}</em></button>
+                    } @empty { <p>This is the first saved request for this phone number.</p> }
+                  </section>
+                </div>
+              }
             </article>
           } @empty {
             @if (!requestStore.loading()) {
@@ -499,6 +638,31 @@
         </div>
       </section>
     }
+    @if (section() === "activity") {
+      <section class="admin-panel-block activity-history">
+        <div class="block-heading">
+          <div><span>Owner audit trail</span><h2>Recent administrative actions</h2></div>
+        </div>
+        @if (activity.loading()) {
+          <p class="activity-state">Loading activity history…</p>
+        } @else if (activity.error()) {
+          <p class="dashboard-error">{{ activity.error() }}</p>
+        } @else {
+          <div class="activity-list">
+            @for (entry of activity.activities(); track entry.id) {
+              <article>
+                <i [attr.data-type]="entry.entityType">{{ entry.entityType.charAt(0).toUpperCase() }}</i>
+                <div><span>{{ activityTypeLabel(entry.type) }}</span><strong>{{ entry.title }}</strong><p>{{ entry.description }}</p></div>
+                <time [attr.datetime]="entry.createdAt">{{ movementDate(entry.createdAt) }}</time>
+              </article>
+            } @empty {
+              <div class="activity-empty"><strong>No administrative actions recorded yet.</strong><p>New catalog, inventory and request changes will appear here.</p></div>
+            }
+          </div>
+        }
+      </section>
+    }
+
     @if (section() === "settings") {
       <section class="admin-panel-block store-settings-panel">
         <div class="block-heading">
@@ -627,6 +791,12 @@
           placeholder="e.g. WIG-CURLY-001"
         /><small>Unique supplier or internal reference.</small></label
       >
+      <label>Publication status<select name="status">
+        <option value="draft">Draft — visible only to the owner</option>
+        <option value="published">Published — visible in the storefront</option>
+        <option value="hidden">Hidden — temporarily removed</option>
+        <option value="archived">Archived — discontinued</option>
+      </select><small>New products remain private until you publish them.</small></label>
       <div class="editor-form-row">
         <label
           >Category<select name="category" required>
@@ -838,6 +1008,28 @@
               placeholder="e.g. 180%"
           /></label>
         </div>
+      </section>
+      <section class="purchasing-fields">
+        <div class="purchasing-heading">
+          <span>
+            <strong>Supplier & purchasing</strong>
+            <small>Private information · visible only in the admin workspace</small>
+          </span>
+          <b>Owner only</b>
+        </div>
+        <div class="editor-form-row">
+          <label>Supplier name<input name="supplierName" maxlength="120" placeholder="Company or contact name" /></label>
+          <label>Supplier contact<input name="supplierContact" maxlength="200" placeholder="Phone, WeChat, email…" /></label>
+        </div>
+        <div class="editor-form-row">
+          <label>Supplier reference<input name="supplierReference" maxlength="100" placeholder="Supplier's product code" /></label>
+          <label>Batch or shipment<input name="batchReference" maxlength="100" placeholder="e.g. CN-2026-04" /></label>
+        </div>
+        <div class="editor-form-row">
+          <label>Purchase cost<input name="purchaseCost" type="number" min="0" max="1000000" step="0.01" placeholder="Optional" /><small>Private cost in the store currency.</small></label>
+          <label>Purchase date<input name="purchaseDate" type="date" /></label>
+        </div>
+        <label>Purchasing notes<textarea name="purchasingNotes" rows="3" maxlength="2000" placeholder="Quality, sizing, minimum order or reorder availability…"></textarea></label>
       </section>
       <div class="editor-form-row">
         <label

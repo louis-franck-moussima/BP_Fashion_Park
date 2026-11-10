@@ -1,5 +1,5 @@
-import { Injectable, inject, signal } from '@angular/core';
-import { Product, StockMovement, StockMovementReason } from './product.model';
+import { Injectable, computed, inject, signal } from '@angular/core';
+import { isProductPublished, Product, ProductPublicationStatus, ProductPurchasingInfo, StockMovement, StockMovementReason } from './product.model';
 import { ProductRepository } from './product-repository.service';
 import { validateProduct } from './catalog-validation';
 
@@ -206,10 +206,15 @@ export class ProductStore {
   readonly products = signal<Product[]>(
     this.repository.firebaseConfigured ? [] : DEMO_PRODUCTS,
   );
+  readonly publicProducts = computed(() =>
+    this.products().filter(isProductPublished),
+  );
   readonly firebaseConfigured = this.repository.firebaseConfigured;
   readonly loading = signal(this.firebaseConfigured);
   readonly loadError = signal('');
   readonly stockHistory = signal<StockMovement[]>([]);
+  readonly recentStockChanges = signal<StockMovement[]>([]);
+  readonly purchasingInfo = signal<Record<string, ProductPurchasingInfo>>({});
   readonly historyLoading = signal(false);
   readonly historyError = signal('');
 
@@ -233,6 +238,11 @@ export class ProductStore {
     return this.products().find((product) => product.id === id);
   }
 
+  findPublic(id: string): Product | undefined {
+    const product = this.find(id);
+    return product && isProductPublished(product) ? product : undefined;
+  }
+
   async save(product: Product): Promise<void> {
     const errors = validateProduct(product);
     if (errors.length) throw new Error(errors.join(' '));
@@ -245,9 +255,27 @@ export class ProductStore {
     );
   }
 
+  async savePurchasingInfo(info: ProductPurchasingInfo): Promise<void> {
+    await this.repository.savePurchasingInfo(info);
+    this.purchasingInfo.update((items) => ({ ...items, [info.productId]: info }));
+  }
+
+  async loadPurchasingInfo(): Promise<void> {
+    if (!this.firebaseConfigured) return;
+    const purchasing = await this.repository.listPurchasingInfo();
+    this.purchasingInfo.set(
+      Object.fromEntries(purchasing.map((info) => [info.productId, info])),
+    );
+  }
+
   async remove(id: string): Promise<void> {
     await this.repository.remove(id);
     this.products.update((items) => items.filter((item) => item.id !== id));
+    this.purchasingInfo.update((items) => {
+      const next = { ...items };
+      delete next[id];
+      return next;
+    });
   }
 
   async adjustStock(
@@ -270,6 +298,30 @@ export class ProductStore {
         ? [movement, ...items].slice(0, 30)
         : items,
     );
+    this.recentStockChanges.update((items) => [movement, ...items].slice(0, 20));
+  }
+
+  async applyInventoryChange(
+    productId: string,
+    stock: number,
+    status: ProductPublicationStatus,
+    lowStockThreshold: number,
+    price: number,
+  ): Promise<void> {
+    const result = await this.repository.applyInventoryChange(
+      productId,
+      stock,
+      status,
+      lowStockThreshold,
+      price,
+    );
+    this.products.update((items) =>
+      items.map((item) => (item.id === productId ? result.product : item)),
+    );
+    if (result.movement) {
+      this.stockHistory.update((items) => [result.movement!, ...items].slice(0, 30));
+      this.recentStockChanges.update((items) => [result.movement!, ...items].slice(0, 20));
+    }
   }
 
   async loadStockHistory(productId: string): Promise<void> {
@@ -282,6 +334,15 @@ export class ProductStore {
       this.historyError.set('Stock history could not be loaded.');
     } finally {
       this.historyLoading.set(false);
+    }
+  }
+
+  async loadRecentStockHistory(): Promise<void> {
+    if (!this.firebaseConfigured) return;
+    try {
+      this.recentStockChanges.set(await this.repository.recentStockHistory());
+    } catch {
+      this.recentStockChanges.set([]);
     }
   }
 
