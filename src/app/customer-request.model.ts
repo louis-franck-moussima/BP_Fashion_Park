@@ -8,6 +8,10 @@ export interface CustomerRequestItem {
   size: string;
   quantity: number;
   priceLabel: string;
+  unitPrice?: number;
+  currency?: string;
+  priceMode?: 'fixed' | 'from' | 'on-request';
+  negotiable?: boolean;
   imageUrl?: string;
 }
 

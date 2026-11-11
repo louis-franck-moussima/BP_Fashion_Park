@@ -1,5 +1,6 @@
 import {
   Component,
+  HostListener,
   OnInit,
   computed,
   effect,
@@ -13,6 +14,7 @@ import { CategoryStore } from './category-store.service';
 import { CartService } from './cart.service';
 import { SeoService } from './seo.service';
 import { StoreSettingsService } from './store-settings.service';
+import { FavoritesService } from './favorites.service';
 
 @Component({
   selector: 'app-product-detail',
@@ -21,6 +23,8 @@ import { StoreSettingsService } from './store-settings.service';
   styleUrls: [
     './product-detail.component.css',
     './product-detail-options.component.css',
+    './product-image-viewer.component.css',
+    './product-favorite.component.css',
   ],
 })
 export class ProductDetailComponent implements OnInit {
@@ -30,6 +34,7 @@ export class ProductDetailComponent implements OnInit {
   readonly categoryStore = inject(CategoryStore);
   readonly cart = inject(CartService);
   readonly storeSettings = inject(StoreSettingsService);
+  readonly favorites = inject(FavoritesService);
   private readonly seo = inject(SeoService);
   readonly catalogLoading = computed(
     () => this.store.loading() || this.categoryStore.loading(),
@@ -40,6 +45,7 @@ export class ProductDetailComponent implements OnInit {
   readonly routeProductId = signal(this.route.snapshot.paramMap.get('id') ?? '');
   readonly productId = computed(() => this.decodeProductId(this.routeProductId()));
   readonly selectedImage = signal(0);
+  readonly imageViewerOpen = signal(false);
   readonly selectedColor = signal<ProductColor | null>(null);
   readonly selectedSize = signal<string | null>(null);
   readonly product = computed(() => {
@@ -175,6 +181,26 @@ export class ProductDetailComponent implements OnInit {
             null,
         );
     }
+  }
+  openImageViewer(index = this.selectedImage()): void {
+    if (!this.visibleImages().length) return;
+    this.selectGalleryImage(index);
+    this.imageViewerOpen.set(true);
+  }
+  closeImageViewer(): void {
+    this.imageViewerOpen.set(false);
+  }
+  changeViewerImage(direction: -1 | 1): void {
+    const count = this.visibleImages().length;
+    if (!count) return;
+    this.selectGalleryImage((this.selectedImage() + direction + count) % count);
+  }
+  @HostListener('document:keydown', ['$event'])
+  handleViewerKeyboard(event: KeyboardEvent): void {
+    if (!this.imageViewerOpen()) return;
+    if (event.key === 'Escape') this.closeImageViewer();
+    if (event.key === 'ArrowLeft') this.changeViewerImage(-1);
+    if (event.key === 'ArrowRight') this.changeViewerImage(1);
   }
   imageColorAt(index: number): string | undefined {
     const product = this.product();

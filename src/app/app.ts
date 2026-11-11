@@ -27,6 +27,7 @@ import { CustomerRequest } from './customer-request.model';
 import { StoreSettingsService } from './store-settings.service';
 import type { CountryCode } from 'libphonenumber-js';
 import type { PhoneCountryOption } from './phone-countries';
+import { FavoritesService } from './favorites.service';
 
 type CategoryFilter = 'All' | ProductCategory;
 type SortOption = 'featured' | 'price-low' | 'price-high' | 'newest';
@@ -36,7 +37,7 @@ type Language = 'en' | 'fr';
   selector: 'app-root',
   imports: [RouterOutlet],
   templateUrl: './app.html',
-  styleUrls: ['./app.css', './app-catalog-nav.css', './app-category-photography.css', './app-product-card-colors.css', './app-socials.css'],
+  styleUrls: ['./app.css', './app-catalog-nav.css', './app-category-photography.css', './app-product-card-colors.css', './app-socials.css', './app-logo.css', './app-favorites.css'],
 })
 export class App implements OnInit, OnDestroy {
   private heroTimer?: ReturnType<typeof setInterval>;
@@ -46,10 +47,12 @@ export class App implements OnInit, OnDestroy {
   readonly auth = inject(AdminAuthService);
   readonly categoryStore = inject(CategoryStore);
   readonly cart = inject(CartService);
+  readonly favorites = inject(FavoritesService);
   readonly customerRequests = inject(CustomerRequestStore);
   readonly storeSettings = inject(StoreSettingsService);
   private readonly seo = inject(SeoService);
   readonly menuOpen = signal(false);
+  readonly favoritesOpen = signal(false);
   readonly mobileMenuPath = signal<string[]>([]);
   readonly megaMenuDismissed = signal(false);
   readonly searchOpen = signal(false);
@@ -81,6 +84,11 @@ export class App implements OnInit, OnDestroy {
   readonly uploadingImages = signal(false);
   readonly uploadError = signal('');
   readonly products = this.store.publicProducts;
+  readonly favoriteProducts = computed(() =>
+    this.favorites.ids()
+      .map(id => this.store.findPublic(id))
+      .filter(product => Boolean(product) && this.categoryStore.isVisible(product!.category)) as Product[],
+  );
   readonly isDetailPage = signal(false);
   readonly isAuthPage = signal(false);
   readonly categories = computed(() => this.categoryStore.active());
@@ -393,6 +401,17 @@ export class App implements OnInit, OnDestroy {
     this.cart.open.set(true);
     void this.loadPhoneCountries();
   }
+  openFavorites(): void {
+    this.closeMobileMenu();
+    this.closeSearch();
+    this.cart.open.set(false);
+    this.favoritesOpen.set(true);
+  }
+  toggleFavorite(productId: string, event?: Event): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+    this.favorites.toggle(productId);
+  }
   async submitCustomerRequest(event: Event): Promise<void> {
     event.preventDefault();
     const form = event.target as HTMLFormElement;
@@ -405,6 +424,10 @@ export class App implements OnInit, OnDestroy {
       size: item.size,
       quantity: item.quantity,
       priceLabel: item.priceLabel,
+      ...(item.unitPrice !== undefined ? { unitPrice: item.unitPrice } : {}),
+      ...(item.currency ? { currency: item.currency } : {}),
+      ...(item.priceMode ? { priceMode: item.priceMode } : {}),
+      ...(item.negotiable !== undefined ? { negotiable: item.negotiable } : {}),
       imageUrl: item.imageUrl,
     }));
     this.requestSubmitting.set(true);

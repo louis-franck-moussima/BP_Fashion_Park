@@ -1,11 +1,7 @@
 <main class="admin-shell">
-  @if (sidebarOpen()) {
-    <button class="admin-sidebar-backdrop" type="button" aria-label="Close navigation" (click)="sidebarOpen.set(false)"></button>
-  }
-  <aside class="admin-sidebar" [class.open]="sidebarOpen()">
-    <button class="admin-sidebar-close" type="button" aria-label="Close navigation" (click)="sidebarOpen.set(false)">×</button>
+  <aside class="admin-sidebar">
     <a routerLink="/" class="admin-brand"
-      ><span>BP</span><small>FASHION PARK</small></a
+      ><img src="/bp-logo.png" alt="BP" /><small>FASHION PARK</small></a
     >
     <nav aria-label="Admin navigation">
       <div class="sidebar-nav-group">
@@ -56,9 +52,6 @@
   </aside>
   <section class="admin-content">
     <header class="admin-topbar">
-      <button class="admin-menu-toggle" type="button" aria-label="Open admin navigation" [attr.aria-expanded]="sidebarOpen()" (click)="sidebarOpen.set(true)">
-        <span></span><span></span><span></span>
-      </button>
       <div>
         <p>BP Fashion Park</p>
         <h1>{{ sectionTitle() }}</h1>
@@ -313,20 +306,6 @@
               ><span class="stock-adjuster"
                 ><strong>{{ stockOf(product) }}</strong
                 ><button
-                  (click)="adjustStock(product, -1, 'decrease')"
-                  [disabled]="
-                    !auth.user() || stockActionId() || stockOf(product) === 0
-                  "
-                  aria-label="Remove one unit"
-                >
-                  −1</button
-                ><button
-                  (click)="adjustStock(product, 1, 'increase')"
-                  [disabled]="!auth.user() || stockActionId()"
-                  aria-label="Add one unit"
-                >
-                  +1</button
-                ><button
                   (click)="restockProduct(product)"
                   [disabled]="!auth.user() || stockActionId()"
                 >
@@ -399,7 +378,7 @@
               <span>{{ categoryStore.pathLabel(product.category) }}</span>
               <label><span class="sr-only">Publication status for {{ product.name }}</span><select [value]="publicationStatus(product)" (change)="setProductStatus(product, $any($event.target).value)"><option value="draft">Draft</option><option value="published">Published</option><option value="hidden">Hidden</option><option value="archived">Archived</option></select></label>
               <span class="inventory-stock"><strong>{{ stockOf(product) }}</strong><small>{{ stockOf(product) === 0 ? "Out of stock" : isLowStock(product) ? "Low stock" : "Available" }}</small></span>
-              <span class="inventory-actions"><button (click)="adjustStock(product, -1, 'decrease')" [disabled]="stockActionId() || stockOf(product) === 0">−1</button><button (click)="adjustStock(product, 1, 'increase')" [disabled]="stockActionId()">+1</button><button (click)="restockProduct(product)" [disabled]="stockActionId()">Restock</button><button (click)="editProduct(product)">Edit</button></span>
+              <span class="inventory-actions"><button (click)="restockProduct(product)" [disabled]="stockActionId()">Restock variant</button><button (click)="editProduct(product)">Edit stock details</button></span>
             </article>
           } @empty { <div class="inventory-empty"><strong>No products match this view</strong><p>Try another inventory filter or clear the global search.</p></div> }
         </div>

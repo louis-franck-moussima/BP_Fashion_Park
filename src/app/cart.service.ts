@@ -13,6 +13,10 @@ export interface CartItem {
   size: string;
   quantity: number;
   priceLabel: string;
+  unitPrice?: number;
+  currency?: string;
+  priceMode?: 'fixed' | 'from' | 'on-request';
+  negotiable?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -50,6 +54,10 @@ export class CartService {
               size,
               quantity: 1,
               priceLabel: this.storeSettings.priceLabel(product),
+              unitPrice: product.price,
+              currency: this.storeSettings.settings().currency,
+              priceMode: product.priceMode ?? 'fixed',
+              negotiable: Boolean(product.negotiable),
             },
           ],
     );
@@ -95,23 +103,13 @@ export class CartService {
   }
 
   whatsappUrlFor(request: CustomerRequest): string {
-    const lines = request.items.map(
-      (item) =>
-        `• ${item.quantity} × ${item.name} — ${item.color}${item.size ? ` — ${item.size}` : ''} — ${item.priceLabel}`,
-    );
     const message = [
-      `Hello BP Fashion Park, my request reference is ${request.reference}.`,
-      `Name: ${request.name}`,
-      `Phone: ${request.phone}`,
-      `City: ${request.city}`,
-      request.message ? `Message: ${request.message}` : '',
-      '',
-      ...lines,
-      '',
+      `Hello BP Fashion Park, I am ${request.name}.`,
+      `I submitted availability request ${request.reference}.`,
       'Please confirm availability, final price and delivery.',
-    ]
-      .filter(Boolean)
-      .join('\n');
+      'I understand that delivery fees are paid by the customer.',
+      'I can attach the reservation PDF with the complete details.',
+    ].join('\n');
     return this.storeSettings.whatsappUrl(message);
   }
 

@@ -25,12 +25,17 @@
     </nav>
     <section class="product-layout">
       <div class="gallery">
-        <div class="gallery-main" [class]="'gallery-main ' + item.art">
+        <div class="gallery-main" [class]="'gallery-main ' + item.art"
+          [class.zoomable]="visibleImages().length" role="button"
+          [attr.tabindex]="visibleImages().length ? 0 : null"
+          [attr.aria-label]="visibleImages().length ? 'Open full-screen image of ' + item.name : null"
+          (click)="openImageViewer()" (keydown.enter)="openImageViewer()" (keydown.space)="openImageViewer(); $event.preventDefault()">
           @if (visibleImages().length) {
             <img
               [src]="visibleImages()[selectedImage()].url"
               [alt]="visibleImages()[selectedImage()].alt || item.name"
             />
+            <span class="image-zoom-hint">View full image</span>
           } @else {
             <div class="fallback-product">
               <span>BP</span><small>{{ categoryName(item.category) }}</small>
@@ -54,7 +59,7 @@
               <button
                 [class.active]="selectedImage() === i"
                 [class.color-selected]="imageColorAt(i)?.toLowerCase() === selectedColor()?.name?.toLowerCase()"
-                (click)="selectGalleryImage(i)"
+                (click)="selectGalleryImage(i); openImageViewer(i)"
                 [attr.aria-label]="'View ' + (imageColorAt(i) || item.name) + ' image'"
               >
                 <img [src]="image.url" [alt]="image.alt" />
@@ -178,6 +183,9 @@
             selectedColorStock() > 0 ? "Add to request bag" : "Selected color unavailable"
           }}
         </button>
+        <button class="detail-favorite" type="button" [class.saved]="favorites.has(item.id)" [attr.aria-pressed]="favorites.has(item.id)" (click)="favorites.toggle(item.id)">
+          <span>{{ favorites.has(item.id) ? "♥" : "♡" }}</span>{{ favorites.has(item.id) ? "Saved to favorites" : "Save to favorites" }}
+        </button>
         <div class="product-notes">
           <p>
             <span>◇</span><strong>Selected with care</strong
@@ -252,6 +260,21 @@
       </section>
     }
   </main>
+  @if (imageViewerOpen() && visibleImages().length) {
+    <div class="image-viewer" role="dialog" aria-modal="true" [attr.aria-label]="item.name + ' image viewer'" (click)="closeImageViewer()">
+      <button class="viewer-close" type="button" aria-label="Close image viewer" (click)="closeImageViewer()">×</button>
+      @if (visibleImages().length > 1) {
+        <button class="viewer-arrow viewer-previous" type="button" aria-label="Previous image" (click)="$event.stopPropagation(); changeViewerImage(-1)">‹</button>
+      }
+      <figure (click)="$event.stopPropagation()">
+        <img [src]="visibleImages()[selectedImage()].url" [alt]="visibleImages()[selectedImage()].alt || item.name" />
+        <figcaption>{{ selectedImage() + 1 }} / {{ visibleImages().length }}@if (imageColorAt(selectedImage()); as color) { · {{ color }} }</figcaption>
+      </figure>
+      @if (visibleImages().length > 1) {
+        <button class="viewer-arrow viewer-next" type="button" aria-label="Next image" (click)="$event.stopPropagation(); changeViewerImage(1)">›</button>
+      }
+    </div>
+  }
 } @else {
   <main class="not-found">
     <p>Product not found</p>

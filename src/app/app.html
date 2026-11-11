@@ -12,7 +12,7 @@
       <span></span><span></span>
     </button>
     <a class="brand" href="/" aria-label="BP Fashion Park home"
-      ><span class="brand-mark">BP</span
+      ><img class="brand-logo" src="/bp-logo.png" alt="BP"
       ><span class="brand-name">FASHION PARK</span></a
     >
     <nav
@@ -136,6 +136,9 @@
           <circle cx="11" cy="11" r="6.5" />
           <path d="m16 16 4 4" />
         </svg></button
+      ><button class="favorites-button" aria-label="Open saved items" [attr.title]="favorites.count() + ' saved item(s)'" [attr.aria-expanded]="favoritesOpen()" (click)="openFavorites()">
+        <svg viewBox="0 0 24 24"><path d="M12 20.2 4.1 12.7A5.2 5.2 0 0 1 11.5 5l.5.6.5-.6a5.2 5.2 0 0 1 7.4 7.7L12 20.2Z" /></svg><span>{{ favorites.count() }}</span>
+      </button
       ><button
         class="bag-button"
         aria-label="Open request bag"
@@ -150,6 +153,25 @@
       </button>
     </div>
   </header>
+  @if (favoritesOpen()) {
+    <div class="favorites-backdrop" (click)="favoritesOpen.set(false)"></div>
+    <aside class="favorites-drawer" role="dialog" aria-modal="true" aria-label="Saved items" (keydown.escape)="favoritesOpen.set(false)">
+      <header><div><small>Your selection</small><h2>Saved items</h2></div><button type="button" aria-label="Close saved items" (click)="favoritesOpen.set(false)">×</button></header>
+      <div class="favorites-list">
+        @for (product of favoriteProducts(); track product.id) {
+          <article>
+            <button class="favorite-product" type="button" (click)="favoritesOpen.set(false); openProduct(product.id)">
+              @if (product.images.length) { <img [src]="product.images[0].url" [alt]="product.name" /> } @else { <span>{{ product.name.charAt(0) }}</span> }
+              <span><strong>{{ product.name }}</strong><small>{{ categoryName(product.category) }}</small><b>{{ priceLabel(product) }}</b></span>
+            </button>
+            <button class="favorite-remove" type="button" (click)="favorites.remove(product.id)" [attr.aria-label]="'Remove ' + product.name + ' from saved items'">Remove</button>
+          </article>
+        } @empty {
+          <div class="favorites-empty"><span>♡</span><strong>No saved items yet</strong><p>Use the heart on a product to keep it here.</p></div>
+        }
+      </div>
+    </aside>
+  }
   @if (searchOpen()) {
     <div class="search-backdrop" (click)="closeSearch()"></div>
     <section
@@ -349,8 +371,8 @@
             <p class="request-error" role="alert">{{ requestError() }}</p>
           }
           <small
-            >This sends an availability request. It is not a payment or
-            confirmed order.</small
+            >This is an availability request, not a payment or confirmed order.
+            Product prices are confirmed by the owner, and delivery fees are paid by the customer.</small
           >
           <button type="submit" [disabled]="requestSubmitting()">
             {{
@@ -372,6 +394,7 @@
             (click)="shareRequestPdf(request)"
             [disabled]="requestPdfBusy()"
           >{{ requestPdfBusy() ? "Preparing PDF…" : "Share reservation PDF" }}</button>
+          <p class="request-share-help">Choose WhatsApp, then select the BP Fashion Park conversation. The PDF contains the complete request.</p>
           <button type="button" class="request-download-pdf" (click)="downloadRequestPdf(request)" [disabled]="requestPdfBusy()">Download PDF</button>
           @if (requestPdfError()) { <p class="request-error">{{ requestPdfError() }}</p> }
           <button type="button" class="request-new" (click)="startNewRequest()">Start a new request</button>
@@ -380,7 +403,7 @@
             target="_blank"
             rel="noopener"
             (click)="finishCustomerRequest()"
-            >Send text on WhatsApp</a
+            >Message the owner on WhatsApp</a
           >
         </section>
       }
@@ -636,10 +659,13 @@
                         <div class="art-object"></div>
                       }
                       <button
-                        aria-label="Save {{ product.name }}"
-                        (click)="$event.stopPropagation()"
+                        class="card-favorite"
+                        [class.saved]="favorites.has(product.id)"
+                        [attr.aria-label]="(favorites.has(product.id) ? 'Remove ' : 'Save ') + product.name"
+                        [attr.aria-pressed]="favorites.has(product.id)"
+                        (click)="toggleFavorite(product.id, $event)"
                       >
-                        ♡
+                        {{ favorites.has(product.id) ? "♥" : "♡" }}
                       </button>
                     </div>
                     <div class="product-info">
@@ -1006,7 +1032,7 @@
   <footer class="site-footer">
     <div class="footer-intro">
       <a class="brand footer-brand" href="/"
-        ><span class="brand-mark">BP</span
+        ><img class="brand-logo" src="/bp-logo.png" alt="BP"
         ><span class="brand-name">FASHION PARK</span></a
       >
       <p>
